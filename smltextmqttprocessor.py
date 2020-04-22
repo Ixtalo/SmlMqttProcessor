@@ -7,15 +7,15 @@ the output of libsml-sml_server binary, and sending of
 processed SML values to MQTT.
 
 Run it with:
-`./sml_server /dev/ttyAMA0 | python smltextmqttprocessor.py -v config.local.ini -`
+`./sml_server_arm /dev/ttyAMA0 | python smltextmqttprocessor.py -v config.local.ini -`
 
 Usage:
-  smltextmqttprocessor.py [options] <config-file.ini> (<input>)
+  smltextmqttprocessor.py [options] <config-file.ini> <input>
   smltextmqttprocessor.py -h | --help
   smltextmqttprocessor.py --version
 
 Arguments:
-  <config-file.ini> Configuration file [default: config.local.ini]
+  config-file.ini Configuration file [default: config.local.ini]
   input           Input file or '-' for STDIN.
 
 Options:
@@ -58,9 +58,9 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.0"
+__version__ = "1.0.1"
 __date__ = "2020-04-21"
-__updated__ = "2020-04-21"
+__updated__ = "2020-04-22"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -102,7 +102,7 @@ def hmean(values):
     if np.all(ar > 0):
         return len(values) / np.sum(1.0 / ar)
     else:
-        return None
+        return 0
 
 
 def main():
@@ -128,6 +128,10 @@ def main():
         logging.getLogger('').setLevel(logging.ERROR)
 
     ## Configuration
+    if not os.path.isabs(arg_configfile):
+        arg_configfile = os.path.join(__script_dir, arg_configfile)
+    arg_configfile = os.path.abspath(arg_configfile)
+    logging.info("Config file: %s", arg_configfile)
     config = configparser.ConfigParser()
     config.read(arg_configfile)
 
@@ -163,6 +167,10 @@ def main():
             client.publish("tele/smartmeter/power/total/value", a_total[-1])
             client.publish("tele/smartmeter/power/actual/mean", round(statistics.mean(a_actual)))
             client.publish("tele/smartmeter/power/actual/hmean", round(hmean(a_actual)))
+            client.publish("tele/smartmeter/power/actual/min", min(a_actual))
+            client.publish("tele/smartmeter/power/actual/max", max(a_actual))
+            client.publish("tele/smartmeter/power/actual/percentile20", np.percentile(a_actual, 20))
+            client.publish("tele/smartmeter/power/actual/percentile80", np.percentile(a_actual, 80))
 
             ## reset
             a_total = []
