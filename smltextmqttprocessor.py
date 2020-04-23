@@ -19,8 +19,10 @@ Arguments:
   input           Input file or '-' for STDIN.
 
 Options:
+  --no-mqtt       Do not send over MQTT (mainly for testing).
   -q --quiet      Be quiet, show only errors.
   -v --verbose    Verbose output.
+  --debug         Debug mode (logging.DEBUG).
   -h --help       Show this screen.
   --version       Show version.
 """
@@ -58,7 +60,7 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.1"
+__version__ = "1.2"
 __date__ = "2020-04-21"
 __updated__ = "2020-04-23"
 __author__ = "Ixtalo"
@@ -81,6 +83,13 @@ if sys.version_info < (3, 0):
     sys.exit(1)
 
 
+class DummyMqtt:
+    def connect(self, host, port=1883, keepalive=60, bind_address=""):
+        logging.info("DummyMqtt: %s:%d", host, port)
+
+    def publish(self, topic, payload=None, qos=0, retain=False):
+        logging.info("DummyMqtt: %s: %s", topic, payload)
+
 def on_connect(client, userdata, flags, rc):
     logging.info("MQTT connected: %s (%d)", mqtt.error_string(rc), rc)
 
@@ -100,13 +109,15 @@ def main():
     arg_configfile = arguments['<config-file.ini>']
     arg_input = arguments['<input>']
     arg_verbose = arguments['--verbose']
+    arg_debug = arguments['--debug']
     arg_quiet = arguments['--quiet']
+    arg_no_mqtt = arguments['--no-mqtt']
 
     ## setup logging
     logging.basicConfig(level=logging.WARNING,
                         format='%(asctime)s %(levelname)-8s %(name)-10s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
-    if DEBUG:
+    if DEBUG or arg_debug:
         logging.getLogger('').setLevel(logging.DEBUG)
         logging.debug('---- ENABLING DEBUG OUTPUT!!! -------')
         logging.debug(arguments)
@@ -124,15 +135,18 @@ def main():
     config.read(arg_configfile)
 
     ## MQTT
-    client = mqtt.Client()
-    client.on_connect = on_connect
-    client.on_disconnect = on_disconnect
-    if config.has_option('Mqtt', 'username'):
-        client.username_pw_set(config.get('Mqtt', 'username'), password=config.get('Mqtt', 'password'))
-    client.reconnect_delay_set(min_delay=1, max_delay=120)
-    client.connect(config.get('Mqtt', 'host'), port=config.getint('Mqtt', 'port', fallback=1883))
+    if arg_no_mqtt:
+        client = DummyMqtt()
+    else:
+        client = mqtt.Client()
+        client.on_connect = on_connect
+        client.on_disconnect = on_disconnect
+        if config.has_option('Mqtt', 'username'):
+            client.username_pw_set(config.get('Mqtt', 'username'), password=config.get('Mqtt', 'password'))
+        client.reconnect_delay_set(min_delay=1, max_delay=120)
+        client.connect(config.get('Mqtt', 'host'), port=config.getint('Mqtt', 'port', fallback=1883))
 
-    ## Rolling window period
+    ## rolling window period
     block_size = config.getint(configparser.DEFAULTSECT, 'block_size')
     logging.info('Block size: %d', block_size)
     client.publish("tele/smartmeter/block/size", block_size)
@@ -189,14 +203,16 @@ def main():
         line_act_sensor_time = istream.readline().strip()
         if line_act_sensor_time.startswith(SML_ACT_SENSOR_TIME):
             ## found a matching line, take the value from this line for the act_sensor_time
-            _, value, _ = line_power_total.split('#', 2)
+            _, value, _ = line_act_sensor_time.split('#', 2)
             value = int(value)
+            logging.debug("act_time_heuristic: found! %d", value)
             a_times.append(value)
         else:
+            logging.debug("act_time_heuristic: nothing found, using time.time()")
             ## no act_sensor_time field found, rollback in stream
             istream.seek(cur_pos)
             ## use our current timestamp because none from SML
-            a_times.append(time.time())
+            a_times.append(int(time.time()))
 
         if line_power_total.startswith(SML_POWER_TOTAL):
             ## "1-0:1.8.0*255#837566.4#Wh"
@@ -219,8 +235,7 @@ def main():
 
 if __name__ == "__main__":
     if DEBUG:
-        # sys.argv.append("-h")
-        pass
+        sys.argv.append("--debug")
     if TESTRUN:
         import doctest
         doctest.testmod()
