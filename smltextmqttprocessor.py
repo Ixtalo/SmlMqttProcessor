@@ -71,6 +71,7 @@ __status__ = "Production"
 SML_POWER_ACTUAL = '1-0:16.7.0*255'
 SML_POWER_TOTAL = '1-0:1.8.0*255'
 SML_ACT_SENSOR_TIME = 'act_sensor_time'
+MQTT_TOPIC_PREFIX = 'tele/smartmeter'
 
 DEBUG = 0
 TESTRUN = 0
@@ -88,7 +89,7 @@ class DummyMqtt:
         logging.info("DummyMqtt: %s:%d", host, port)
 
     def publish(self, topic, payload=None, qos=0, retain=False):
-        logging.info("DummyMqtt: %s: %s", topic, payload)
+        logging.info("DummyMqtt: %s %s", topic, payload)
 
 def on_connect(client, userdata, flags, rc):
     logging.info("MQTT connected: %s (%d)", mqtt.error_string(rc), rc)
@@ -100,6 +101,72 @@ def on_disconnect(client, userdata, rc):
         rc = client.reconnect()
         if rc != 0:
             logging.error("MQTT reconnect failed! %s (%d)", mqtt.error_string(rc), rc)
+
+
+def check_stream_packet_begin(istream):
+    line = istream.readline().strip()
+    if not line or not line.startswith('1-0:96.50.1*1#') or line.startswith('#'):
+        return False
+    ## yes, this is the starting line
+    return True
+
+
+def sml_getvalue_heuristic(istream, field_startswith):
+    pos = istream.tell()
+    line = istream.readline().strip()
+    value = None
+    if line.startswith(field_startswith):
+        ## found a matching line, take the value from this line
+        _, value, unit = line.split('#', 2)
+        value = float(value)
+    else:
+        ## no such field found, rollback in stream
+        istream.seek(pos)
+    return value
+
+
+def parse_stream(istream, a_times, a_total, a_actual):
+    istream.readline()  ## do not use line with serial number ("1-0:96.1.0*255#...#")
+
+    ## "1-0:1.8.0*255#837566.4#Wh"
+    value = sml_getvalue_heuristic(istream, SML_POWER_TOTAL)
+    logging.debug("sml_getvalue_heuristic SML_POWER_TOTAL: %s", value)
+    if value:
+        a_total.append(float(value))
+
+    ## "1-0:16.7.0*255#273#W"
+    value = sml_getvalue_heuristic(istream, SML_POWER_ACTUAL)
+    logging.debug("sml_getvalue_heuristic SML_POWER_ACTUAL: %s", value)
+    if value:
+        a_actual.append(float(value))
+
+    ## "act_sensor_time#7710226#"
+    value = sml_getvalue_heuristic(istream, SML_ACT_SENSOR_TIME)
+    logging.debug("sml_getvalue_heuristic SML_POWER_ACTUAL: %s", value)
+    if value:
+        a_times.append(int(value))
+
+
+def send_mqtt(client, a_times, a_total, a_actual):
+    ## MQTT publishing
+    logging.info("MQTT sending ...")
+    if a_times:  ## times array could actually be empty!
+        client.publish("%s/time/first" % MQTT_TOPIC_PREFIX, a_times[0])
+        client.publish("%s/time/last" % MQTT_TOPIC_PREFIX, a_times[-1])
+    client.publish("%s/power/total/value" % MQTT_TOPIC_PREFIX, a_total[-1])
+    client.publish("%s/power/actual/first" % MQTT_TOPIC_PREFIX, a_actual[0])
+    client.publish("%s/power/actual/last" % MQTT_TOPIC_PREFIX, a_actual[-1])
+    client.publish("%s/power/actual/median" % MQTT_TOPIC_PREFIX, statistics.median(a_actual))
+    client.publish("%s/power/actual/mean" % MQTT_TOPIC_PREFIX, round(statistics.mean(a_actual)))
+    client.publish("%s/power/actual/min" % MQTT_TOPIC_PREFIX, min(a_actual))
+    client.publish("%s/power/actual/max" % MQTT_TOPIC_PREFIX, max(a_actual))
+    client.publish("%s/power/actual/percentile20" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 20))
+    client.publish("%s/power/actual/percentile80" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 80))
+    ## check if all arrays contain the same amount of elements
+    if len(a_actual) != len(a_total):
+        ## varying lengths! report that!
+        client.publish("%s/block/total" % MQTT_TOPIC_PREFIX, len(a_total))
+        client.publish("%s/block/actual" % MQTT_TOPIC_PREFIX, len(a_actual))
 
 
 def main():
@@ -149,7 +216,7 @@ def main():
     ## rolling window period
     block_size = config.getint(configparser.DEFAULTSECT, 'block_size')
     logging.info('Block size: %d', block_size)
-    client.publish("tele/smartmeter/block/size", block_size)
+    client.publish("%s/block/size" % MQTT_TOPIC_PREFIX, block_size)
 
     if arg_input == '-':
         istream = sys.stdin
@@ -165,20 +232,7 @@ def main():
     a_times = []
     while True:
         if len(a_total) > block_size:
-            ## MQTT publishing
-            logging.info("MQTT sending ...")
-            client.publish("tele/smartmeter/time/first", a_times[0])
-            client.publish("tele/smartmeter/time/last", a_times[-1])
-            client.publish("tele/smartmeter/power/total/value", a_total[-1])
-            client.publish("tele/smartmeter/power/actual/first", a_actual[0])
-            client.publish("tele/smartmeter/power/actual/last", a_actual[-1])
-            client.publish("tele/smartmeter/power/actual/median", statistics.median(a_actual))
-            client.publish("tele/smartmeter/power/actual/mean", round(statistics.mean(a_actual)))
-            client.publish("tele/smartmeter/power/actual/min", min(a_actual))
-            client.publish("tele/smartmeter/power/actual/max", max(a_actual))
-            client.publish("tele/smartmeter/power/actual/percentile20", np.percentile(a_actual, 20))
-            client.publish("tele/smartmeter/power/actual/percentile80", np.percentile(a_actual, 80))
-
+            send_mqtt(client, a_times, a_total, a_actual)
             ## reset
             a_total = []
             a_actual = []
@@ -188,43 +242,12 @@ def main():
         ## 1-0:96.1.0*255#0a 01 49 53 4b 01 23 45 67 89 #
         ## 1-0:1.8.0*255#837566.4#Wh
         ## 1-0:16.7.0*255#273#W
-        line = istream.readline().strip()
-        if not line or not line.startswith('1-0:96.50.1*1#') or line.startswith('#'):
-            time.sleep(0.3)
-            continue
-
-        istream.readline()  ## do not use
-        line_power_total = istream.readline().strip()
-        line_power_actual = istream.readline().strip()
-
-        ## heuristic to check if next line is act_sensor_time
-        ## (special version of sml_server EXE)
-        cur_pos = istream.tell()
-        line_act_sensor_time = istream.readline().strip()
-        if line_act_sensor_time.startswith(SML_ACT_SENSOR_TIME):
-            ## found a matching line, take the value from this line for the act_sensor_time
-            _, value, _ = line_act_sensor_time.split('#', 2)
-            value = int(value)
-            logging.debug("act_time_heuristic: found! %d", value)
-            a_times.append(value)
+        ## act_sensor_time#7710218#    <-- special/own version of sml_server!
+        if check_stream_packet_begin(istream):
+            parse_stream(istream, a_times, a_total, a_actual)
         else:
-            logging.debug("act_time_heuristic: nothing found, using time.time()")
-            ## no act_sensor_time field found, rollback in stream
-            istream.seek(cur_pos)
-            ## use our current timestamp because none from SML
-            a_times.append(int(time.time()))
-
-        if line_power_total.startswith(SML_POWER_TOTAL):
-            ## "1-0:1.8.0*255#837566.4#Wh"
-            _, value, unit = line_power_total.split('#', 2)
-            value = float(value)
-            a_total.append(value)
-
-        if line_power_actual.startswith(SML_POWER_ACTUAL):
-            ## "1-0:16.7.0*255#273#W"
-            _, value, unit = line_power_actual.split('#', 2)
-            value = float(value)
-            a_actual.append(value)
+            ## some grace time to give the smartmeter time to send again (periodically very 1 sec)
+            time.sleep(0.3)
 
         ## if this is a file stream then break when EOF is reached
         if istream_size > 0 and istream.tell() >= istream_size:
