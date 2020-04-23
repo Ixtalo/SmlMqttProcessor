@@ -58,7 +58,7 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.0.2"
+__version__ = "1.1"
 __date__ = "2020-04-21"
 __updated__ = "2020-04-23"
 __author__ = "Ixtalo"
@@ -68,6 +68,7 @@ __status__ = "Production"
 
 SML_POWER_ACTUAL = '1-0:16.7.0*255'
 SML_POWER_TOTAL = '1-0:1.8.0*255'
+SML_ACT_SENSOR_TIME = 'act_sensor_time'
 
 DEBUG = 0
 TESTRUN = 0
@@ -147,11 +148,17 @@ def main():
 
     a_total = []
     a_actual = []
+    a_times = []
     while True:
         if len(a_total) > block_size:
             ## MQTT publishing
             logging.info("MQTT sending ...")
+            client.publish("tele/smartmeter/time/first", a_times[0])
+            client.publish("tele/smartmeter/time/last", a_times[-1])
             client.publish("tele/smartmeter/power/total/value", a_total[-1])
+            client.publish("tele/smartmeter/power/actual/first", a_actual[0])
+            client.publish("tele/smartmeter/power/actual/last", a_actual[-1])
+            client.publish("tele/smartmeter/power/actual/median", statistics.median(a_actual))
             client.publish("tele/smartmeter/power/actual/mean", round(statistics.mean(a_actual)))
             client.publish("tele/smartmeter/power/actual/min", min(a_actual))
             client.publish("tele/smartmeter/power/actual/max", max(a_actual))
@@ -161,6 +168,7 @@ def main():
             ## reset
             a_total = []
             a_actual = []
+            a_times = []
 
         ## 1-0:96.50.1*1#ISK#
         ## 1-0:96.1.0*255#0a 01 49 53 4b 01 23 45 67 89 #
@@ -175,6 +183,21 @@ def main():
         line_power_total = istream.readline().strip()
         line_power_actual = istream.readline().strip()
 
+        ## heuristic to check if next line is act_sensor_time
+        ## (special version of sml_server EXE)
+        cur_pos = istream.tell()
+        line_act_sensor_time = istream.readline().strip()
+        if line_act_sensor_time.startswith(SML_ACT_SENSOR_TIME):
+            ## found a matching line, take the value from this line for the act_sensor_time
+            _, value, _ = line_power_total.split('#', 2)
+            value = int(value)
+            a_times.append(value)
+        else:
+            ## no act_sensor_time field found, rollback in stream
+            istream.seek(cur_pos)
+            ## use our current timestamp because none from SML
+            a_times.append(time.time())
+
         if line_power_total.startswith(SML_POWER_TOTAL):
             ## "1-0:1.8.0*255#837566.4#Wh"
             _, value, unit = line_power_total.split('#', 2)
@@ -187,6 +210,7 @@ def main():
             value = float(value)
             a_actual.append(value)
 
+        ## if this is a file stream then break when EOF is reached
         if istream_size > 0 and istream.tell() >= istream_size:
             break
 
