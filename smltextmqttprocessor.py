@@ -58,9 +58,9 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __date__ = "2020-04-21"
-__updated__ = "2020-04-22"
+__updated__ = "2020-04-23"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -90,19 +90,6 @@ def on_disconnect(client, userdata, rc):
         rc = client.reconnect()
         if rc != 0:
             logging.error("MQTT reconnect failed! %s (%d)", mqtt.error_string(rc), rc)
-
-
-def hmean(values):
-    """
-    Harmonic mean
-    :param values: list of positive values
-    :return:
-    """
-    ar = np.array(values)
-    if np.all(ar > 0):
-        return len(values) / np.sum(1.0 / ar)
-    else:
-        return 0
 
 
 def main():
@@ -166,7 +153,6 @@ def main():
             logging.info("MQTT sending ...")
             client.publish("tele/smartmeter/power/total/value", a_total[-1])
             client.publish("tele/smartmeter/power/actual/mean", round(statistics.mean(a_actual)))
-            client.publish("tele/smartmeter/power/actual/hmean", round(hmean(a_actual)))
             client.publish("tele/smartmeter/power/actual/min", min(a_actual))
             client.publish("tele/smartmeter/power/actual/max", max(a_actual))
             client.publish("tele/smartmeter/power/actual/percentile20", np.percentile(a_actual, 20))
@@ -213,12 +199,10 @@ if __name__ == "__main__":
         pass
     if TESTRUN:
         import doctest
-
         doctest.testmod()
     if PROFILE:
         import cProfile
         import pstats
-
         profile_filename = __file__ + '.profile.bin'
         cProfile.run('main()', profile_filename)
         with open("%s.txt" % profile_filename, "wb") as statsfp:
