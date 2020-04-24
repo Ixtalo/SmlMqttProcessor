@@ -1,0 +1,3 @@
+[submodule "sml_server/libsml"]
+	path = sml_server/libsml
+	url = https://github.com/volkszaehler/libsml.git

@@ -45,7 +45,6 @@ import statistics
 
 from codecs import open
 from docopt import docopt
-import numpy as np
 ## PySerial, https://pypi.org/project/pyserial/
 import serial
 ## https://pypi.org/project/paho-mqtt/#usage-and-api
@@ -86,19 +85,6 @@ def on_disconnect(client, userdata, rc):
     if rc != 0:
         logging.warning("Unexpected disconnection! %s (%d)", mqtt.error_string(rc), rc)
         client.reconnect()
-
-
-def hmean(values):
-    """
-    Harmonic mean
-    :param values: list of positive values
-    :return:
-    """
-    ar = np.array(values)
-    if np.all(ar > 0):
-        return len(values) / np.sum(1.0 / ar)
-    else:
-        return None
 
 
 def main():
@@ -164,7 +150,6 @@ def main():
             client.publish("tele/smartmeter/sensor_time/value", a_times[-1])
             client.publish("tele/smartmeter/power/total/value", a_total[-1])
             client.publish("tele/smartmeter/power/actual/mean", round(statistics.mean(a_actual)))
-            client.publish("tele/smartmeter/power/actual/hmean", round(hmean(a_actual)))
 
             ## reset
             a_total = []
