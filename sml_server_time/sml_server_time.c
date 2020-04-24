@@ -145,7 +145,7 @@ void transport_receiver(unsigned char *buffer, size_t buffer_len) {
 				}
 			}
 			
-			// AST, 23.04.2020
+			// modification
 			printf("act_sensor_time#%u#\n", *body->act_sensor_time->data.sec_index);
 
 			if (sflag)

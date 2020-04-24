@@ -1,7 +1,7 @@
 UNAME := $(shell uname)
-CFLAGS += -g -std=c99 -Wall -Wextra -pedantic
+CFLAGS += -I./libsml/sml/include/ -g -std=c99 -Wall -Wextra -pedantic
 OBJS = sml_server_time.o
-#LIBSML = ../sml/lib/libsml.a
+LIBSML = ./libsml/sml/lib/libsml.a
 
 LIBS = -lm
 ifneq ($(UNAME), Darwin)
@@ -10,8 +10,7 @@ endif
 
 all: sml_server_time
 
-#sml_server_time: $(OBJS) $(LIBSML)
-sml_server_time: $(OBJS)
+sml_server_time: $(OBJS) $(LIBSML)
 	$(CC) $(OBJS) $(LIBSML) $(LIBS) -o sml_server_time
 
 %.o: %.c
@@ -21,4 +20,3 @@ sml_server_time: $(OBJS)
 clean:
 	@rm -f *.o
 	@rm -f sml_server_time
-
