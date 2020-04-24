@@ -112,15 +112,17 @@ def check_stream_packet_begin(istream):
 
 
 def sml_getvalue_heuristic(istream, field_startswith):
-    pos = istream.tell()
+    if istream.seekable():
+        pos = istream.tell()
     line = istream.readline().strip()
     value = None
     if line.startswith(field_startswith):
         ## found a matching line, take the value from this line
         _, value, unit = line.split('#', 2)
     else:
-        ## no such field found, rollback in stream
-        istream.seek(pos)
+        if istream.seekable():
+            ## no such field found, rollback in stream
+            istream.seek(pos)
     return value
 
 
@@ -250,7 +252,7 @@ def main():
             time.sleep(0.3)
 
         ## if this is a file stream then break when EOF is reached
-        if istream_size > 0 and istream.tell() >= istream_size:
+        if istream_size > 0 and istream.seekable() and istream.tell() >= istream_size:
             break
 
     return 0
