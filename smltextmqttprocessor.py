@@ -26,6 +26,8 @@ Options:
   -h --help       Show this screen.
   --version       Show version.
 """
+import configparser
+import logging
 ##
 ## LICENSE:
 ##
@@ -45,20 +47,17 @@ Options:
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##
 import os
+import statistics
 import sys
 import time
-import logging
-import configparser
-import statistics
-
 from codecs import open
-from docopt import docopt
-import numpy as np
+
 ## https://pypi.org/project/paho-mqtt/#usage-and-api
 import paho.mqtt.client as mqtt
 ## PySML, https://pypi.org/project/pysml/
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
+from docopt import docopt
 
 __version__ = "1.2"
 __date__ = "2020-04-21"
@@ -70,7 +69,7 @@ __status__ = "Production"
 
 SML_POWER_ACTUAL = '1-0:16.7.0*255'
 SML_POWER_TOTAL = '1-0:1.8.0*255'
-SML_ACT_SENSOR_TIME = 'act_sensor_time'
+SML_SENSOR_TIME = 'act_sensor_time'
 MQTT_TOPIC_PREFIX = 'tele/smartmeter'
 
 DEBUG = 0
@@ -90,6 +89,7 @@ class DummyMqtt:
 
     def publish(self, topic, payload=None, qos=0, retain=False):
         logging.info("DummyMqtt: %s %s", topic, payload)
+
 
 def on_connect(client, userdata, flags, rc):
     logging.info("MQTT connected: %s (%d)", mqtt.error_string(rc), rc)
@@ -118,7 +118,6 @@ def sml_getvalue_heuristic(istream, field_startswith):
     if line.startswith(field_startswith):
         ## found a matching line, take the value from this line
         _, value, unit = line.split('#', 2)
-        value = float(value)
     else:
         ## no such field found, rollback in stream
         istream.seek(pos)
@@ -141,7 +140,7 @@ def parse_stream(istream, a_times, a_total, a_actual):
         a_actual.append(float(value))
 
     ## "act_sensor_time#7710226#"
-    value = sml_getvalue_heuristic(istream, SML_ACT_SENSOR_TIME)
+    value = sml_getvalue_heuristic(istream, SML_SENSOR_TIME)
     logging.debug("sml_getvalue_heuristic SML_POWER_ACTUAL: %s", value)
     if value:
         a_times.append(int(value))
@@ -160,9 +159,10 @@ def send_mqtt(client, a_times, a_total, a_actual):
     client.publish("%s/power/actual/mean" % MQTT_TOPIC_PREFIX, round(statistics.mean(a_actual)))
     client.publish("%s/power/actual/min" % MQTT_TOPIC_PREFIX, min(a_actual))
     client.publish("%s/power/actual/max" % MQTT_TOPIC_PREFIX, max(a_actual))
-    client.publish("%s/power/actual/percentile20" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 20))
-    client.publish("%s/power/actual/percentile80" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 80))
-    ## check if all arrays contain the same amount of elements
+    # client.publish("%s/power/actual/percentile20" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 20))
+    # client.publish("%s/power/actual/percentile80" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 80))
+
+    ## check if arrays contain the same amount of elements
     if len(a_actual) != len(a_total):
         ## varying lengths! report that!
         client.publish("%s/block/total" % MQTT_TOPIC_PREFIX, len(a_total))
