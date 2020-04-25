@@ -104,7 +104,7 @@ def on_disconnect(client, userdata, rc):
 
 
 def check_stream_packet_begin(istream):
-    line = istream.readline().strip()
+    line = istream.readline(100).strip()
     if not line or not line.startswith('1-0:96.50.1*1#') or line.startswith('#'):
         return False
     ## yes, this is the starting line
@@ -114,6 +114,9 @@ def check_stream_packet_begin(istream):
 def sml_getvalue_heuristic(istream, field_startswith):
     if istream.seekable():
         pos = istream.tell()
+    else:
+        ## only for PyCharm code review...
+        pos = 0
     line = istream.readline().strip()
     value = None
     if line.startswith(field_startswith):
@@ -249,6 +252,7 @@ def main():
             parse_stream(istream, a_times, a_total, a_actual)
         else:
             ## some grace time to give the smartmeter time to send again (periodically very 1 sec)
+            logging.debug("Nothing found, trying again...")
             time.sleep(0.3)
 
         ## if this is a file stream then break when EOF is reached
