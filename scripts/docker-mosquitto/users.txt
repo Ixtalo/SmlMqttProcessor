@@ -1,0 +1,2 @@
+## foo:bar
+foo:$6$NBk+Bm4yAmiQkwln$HMabSvTJ0vTf96sSnwaL8C0E9lQq2zMQ2ckymiwoFLvLiE6kmICbh7MXt0jb008WVzVJhIYA1iINLC85fzAMYA==

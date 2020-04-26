@@ -4,7 +4,7 @@
 import io
 import pytest
 import smltextmqttprocessor as stmp
-
+from configparser import ConfigParser
 
 class TestInputStream:
 
@@ -148,9 +148,11 @@ act_sensor_time#1234567#""")
 class TestMqtt:
 
     def test_send_mqtt(self, monkeypatch):
-        client = stmp.mqtt.Client()
 
-        def publish_dummy(_, topic, payload=None, qos=0, retain=False):
+        def connect_dummy(client, host, port=1883, keepalive=60, bind_address=""):
+            print("CONNECT DUMMY", host, port)
+
+        def publish_dummy(client, topic, payload=None, qos=0, retain=False):
             print(topic, payload)
             assert topic.startswith(stmp.MQTT_TOPIC_PREFIX)
             if topic == 'tele/smartmeter/time/first':
@@ -172,9 +174,18 @@ class TestMqtt:
             elif topic == 'tele/smartmeter/power/actual/max':
                 assert payload == 99
 
+        ## monkey patching
+        monkeypatch.setattr(stmp.mqtt.Client, "connect", connect_dummy)
         monkeypatch.setattr(stmp.mqtt.Client, "publish", publish_dummy)
 
+        ## test data
         a_total = [1, 2, 3]
         a_actual = [-11, -22, 11, 22, 33, 99]
         a_times = [111, 222, 333]
-        stmp.send_mqtt(client, a_times, a_total, a_actual)
+        config = ConfigParser()
+
+        ## run / test
+        mymqtt = stmp.MyMqtt(config)
+        mymqtt.connected = True
+        mymqtt.client = stmp.mqtt.Client()
+        mymqtt.send_data(a_times, a_total, a_actual)

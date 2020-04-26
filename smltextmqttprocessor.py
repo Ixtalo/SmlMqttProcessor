@@ -26,8 +26,6 @@ Options:
   -h --help       Show this screen.
   --version       Show version.
 """
-import configparser
-import logging
 ##
 ## LICENSE:
 ##
@@ -46,6 +44,8 @@ import logging
 ## You should have received a copy of the GNU Affero General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##
+import configparser
+import logging
 import os
 import statistics
 import sys
@@ -59,9 +59,9 @@ import paho.mqtt.client as mqtt
 import sml
 from docopt import docopt
 
-__version__ = "1.2"
+__version__ = "1.4"
 __date__ = "2020-04-21"
-__updated__ = "2020-04-23"
+__updated__ = "2020-04-26"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -83,24 +83,12 @@ if sys.version_info < (3, 0):
     sys.exit(1)
 
 
-class DummyMqtt:
-    def connect(self, host, port=1883, keepalive=60, bind_address=""):
-        logging.info("DummyMqtt: %s:%d", host, port)
-
-    def publish(self, topic, payload=None, qos=0, retain=False):
-        logging.info("DummyMqtt: %s %s", topic, payload)
-
-
-def on_connect(client, userdata, flags, rc):
-    logging.info("MQTT connected: %s (%d)", mqtt.error_string(rc), rc)
-
-
-def on_disconnect(client, userdata, rc):
-    if rc != 0:
-        logging.warning("MQTT unexpected disconnection! %s (%d)", mqtt.error_string(rc), rc)
-        rc = client.reconnect()
-        if rc != 0:
-            logging.error("MQTT reconnect failed! %s (%d)", mqtt.error_string(rc), rc)
+# class DummyMqtt:
+#    def connect(self, host, port=1883, keepalive=60, bind_address=""):
+#        logging.info("DummyMqtt: %s:%d", host, port)
+#
+#    def publish(self, topic, payload=None, qos=0, retain=False):
+#        logging.info("DummyMqtt: %s %s", topic, payload)
 
 
 def check_stream_packet_begin(istream):
@@ -151,27 +139,91 @@ def parse_stream(istream, a_times, a_total, a_actual):
         a_times.append(int(value))
 
 
-def send_mqtt(client, a_times, a_total, a_actual):
-    ## MQTT publishing
-    logging.info("MQTT sending ...")
-    if a_times:  ## times array could actually be empty!
-        client.publish("%s/time/first" % MQTT_TOPIC_PREFIX, a_times[0])
-        client.publish("%s/time/last" % MQTT_TOPIC_PREFIX, a_times[-1])
-    client.publish("%s/power/total/value" % MQTT_TOPIC_PREFIX, a_total[-1])
-    client.publish("%s/power/actual/first" % MQTT_TOPIC_PREFIX, a_actual[0])
-    client.publish("%s/power/actual/last" % MQTT_TOPIC_PREFIX, a_actual[-1])
-    client.publish("%s/power/actual/median" % MQTT_TOPIC_PREFIX, statistics.median(a_actual))
-    client.publish("%s/power/actual/mean" % MQTT_TOPIC_PREFIX, round(statistics.mean(a_actual)))
-    client.publish("%s/power/actual/min" % MQTT_TOPIC_PREFIX, min(a_actual))
-    client.publish("%s/power/actual/max" % MQTT_TOPIC_PREFIX, max(a_actual))
-    # client.publish("%s/power/actual/percentile20" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 20))
-    # client.publish("%s/power/actual/percentile80" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 80))
+class MyMqtt:
 
-    ## check if arrays contain the same amount of elements
-    if len(a_actual) != len(a_total):
-        ## varying lengths! report that!
-        client.publish("%s/block/total" % MQTT_TOPIC_PREFIX, len(a_total))
-        client.publish("%s/block/actual" % MQTT_TOPIC_PREFIX, len(a_actual))
+    def __init__(self, config):
+        self.client = None
+        self.config = config
+        self.connected = False
+
+    def connect(self):
+
+        def on_connect(client, userdata, flags, rc):
+            logging.info("MQTT connected: %s (%d)", mqtt.connack_string(rc), rc)
+            self.connected = True
+
+        def on_disconnect(client, userdata, rc):
+            self.connected = False
+            if rc == mqtt.MQTT_ERR_SUCCESS:
+                logging.debug('MQTT: disconnect successful.')
+            else:
+                logging.warning("MQTT unexpected disconnection! %s (%d)", mqtt.error_string(rc), rc)
+
+        ##
+        ## NOTE!
+        ## Creating a new Client() seems to be necessary.
+        ## Just using reconnect() or connect() again did not work.
+        ##
+        client = mqtt.Client("SmlTextMqttProcessor")
+
+        ## store as class variable to be accessible later
+        self.client = client
+
+        if self.config.has_option('Mqtt', 'username'):
+            client.username_pw_set(self.config.get('Mqtt', 'username'),
+                                   password=self.config.get('Mqtt', 'password'))
+        client.reconnect_delay_set(min_delay=1, max_delay=120)
+        client.on_connect = on_connect
+        client.on_disconnect = on_disconnect
+
+        ## try-to-connect loop
+        client.connected = False
+        wait_time = 1
+        while not self.connected:
+            try:
+                client.connect(self.config.get('Mqtt', 'host'), port=self.config.getint('Mqtt', 'port', fallback=1883))
+                ## loop_start() is necessary for on_* to work
+                ## (asynchronous handling starts)
+                client.loop_start()
+                break
+            except Exception as ex:
+                logging.error("MQTT connect exception! %s: %s", type(ex).__name__, ex)
+                ## increase waiting time
+                wait_time *= 2
+                ## limit waiting time to max. 180 sec = 3 min
+                wait_effective = min(wait_time, 180)
+                logging.debug("waiting %d seconds before reconnect attempt...", wait_effective)
+                time.sleep(wait_effective)
+
+    def disconnect(self):
+        self.client.disconnect()
+        self.connected = False
+
+    def send_data(self, a_times, a_total, a_actual):
+        if not self.connected:
+            self.connect()
+
+        ## MQTT publishing
+        if a_times:  ## times array could actually be empty!
+            self.client.publish("%s/time/first" % MQTT_TOPIC_PREFIX, a_times[0])
+            self.client.publish("%s/time/last" % MQTT_TOPIC_PREFIX, a_times[-1])
+        self.client.publish("%s/power/total/value" % MQTT_TOPIC_PREFIX, a_total[-1])
+        self.client.publish("%s/power/actual/first" % MQTT_TOPIC_PREFIX, a_actual[0])
+        self.client.publish("%s/power/actual/last" % MQTT_TOPIC_PREFIX, a_actual[-1])
+        self.client.publish("%s/power/actual/median" % MQTT_TOPIC_PREFIX, statistics.median(a_actual))
+        self.client.publish("%s/power/actual/mean" % MQTT_TOPIC_PREFIX, round(statistics.mean(a_actual)))
+        self.client.publish("%s/power/actual/min" % MQTT_TOPIC_PREFIX, min(a_actual))
+        self.client.publish("%s/power/actual/max" % MQTT_TOPIC_PREFIX, max(a_actual))
+        # client.publish("%s/power/actual/percentile20" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 20))
+        # client.publish("%s/power/actual/percentile80" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 80))
+
+        ## check if arrays contain the same amount of elements
+        if len(a_actual) != len(a_total):
+            ## varying lengths! report that!
+            self.client.publish("%s/block/total" % MQTT_TOPIC_PREFIX, len(a_total))
+            self.client.publish("%s/block/actual" % MQTT_TOPIC_PREFIX, len(a_actual))
+
+        self.disconnect()
 
 
 def main():
@@ -207,57 +259,57 @@ def main():
     config.read(arg_configfile)
 
     ## MQTT
-    if arg_no_mqtt:
-        client = DummyMqtt()
-    else:
-        client = mqtt.Client()
-        client.on_connect = on_connect
-        client.on_disconnect = on_disconnect
-        if config.has_option('Mqtt', 'username'):
-            client.username_pw_set(config.get('Mqtt', 'username'), password=config.get('Mqtt', 'password'))
-        client.reconnect_delay_set(min_delay=1, max_delay=120)
-        client.connect(config.get('Mqtt', 'host'), port=config.getint('Mqtt', 'port', fallback=1883))
+    mymqtt = MyMqtt(config)
 
     ## rolling window period
     block_size = config.getint(configparser.DEFAULTSECT, 'block_size')
     logging.info('Block size: %d', block_size)
-    client.publish("%s/block/size" % MQTT_TOPIC_PREFIX, block_size)
 
+    ## input stream
     if arg_input == '-':
         istream = sys.stdin
         istream_size = -1
     else:
         istream = open(arg_input)
         istream_size = os.stat(arg_input).st_size
-
     logging.info(istream)
 
+    ## containers to hold categorical data points
     a_total = []
     a_actual = []
     a_times = []
+
+    ## main loop
     while True:
-        if len(a_total) > block_size:
-            send_mqtt(client, a_times, a_total, a_actual)
-            ## reset
-            a_total = []
-            a_actual = []
-            a_times = []
+        try:
+            if len(a_total) > block_size:
+                if arg_no_mqtt:
+                    print(a_times, a_total, a_actual)
+                else:
+                    mymqtt.send_data(a_times, a_total, a_actual)
+                ## reset containers
+                a_total = []
+                a_actual = []
+                a_times = []
 
-        ## 1-0:96.50.1*1#ISK#
-        ## 1-0:96.1.0*255#0a 01 49 53 4b 01 23 45 67 89 #
-        ## 1-0:1.8.0*255#837566.4#Wh
-        ## 1-0:16.7.0*255#273#W
-        ## act_sensor_time#7710218#    <-- special/own version of sml_server!
-        if check_stream_packet_begin(istream):
-            parse_stream(istream, a_times, a_total, a_actual)
-        else:
-            ## some grace time to give the smartmeter time to send again (periodically very 1 sec)
-            logging.debug("Nothing found, trying again...")
-            time.sleep(0.3)
+            ## 1-0:96.50.1*1#ISK#
+            ## 1-0:96.1.0*255#0a 01 49 53 4b 01 23 45 67 89 #
+            ## 1-0:1.8.0*255#837566.4#Wh
+            ## 1-0:16.7.0*255#273#W
+            ## act_sensor_time#7710218#    <-- special/own version of sml_server!
+            if check_stream_packet_begin(istream):
+                parse_stream(istream, a_times, a_total, a_actual)
+            else:
+                ## some grace time to give the smartmeter time to send again (periodically very 1 sec)
+                logging.debug("Nothing found, trying again...")
+                time.sleep(0.3)
 
-        ## if this is a file stream then break when EOF is reached
-        if istream_size > 0 and istream.seekable() and istream.tell() >= istream_size:
-            break
+            ## if this is a file stream then break when EOF is reached
+            if istream_size > 0 and istream.seekable() and istream.tell() >= istream_size:
+                break
+        except Exception as ex:
+            ## this should not happen...
+            logging.exception(ex)
 
     return 0
 
