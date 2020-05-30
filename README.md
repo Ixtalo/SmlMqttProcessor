@@ -8,6 +8,13 @@ Concept:
 - This implementation uses a Rasperry Pi Zero with an atatched serial optical [TTL reader](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang) to capture SML data sent by a power smart meter. 
 - The SML processing is done by [libsml](https://github.com/volkszaehler/libsml).
 - libsml's textual output is parsed, aggregated for a 1 minute time window and forwared as MQTT statements.
+- The MQTT messages are used in e.g., [Pimatic.org](https://pimatic.org) smart home app to display the power consumption history, or using [Grafana](https://grafana.com).
+
+![Pimatic](./doc/pimatic_powermeter.png)  
+
+![Grafana](./doc/grafana24h.png)  
+
+
 
 
 ## Motivation
