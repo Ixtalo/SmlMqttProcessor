@@ -64,12 +64,12 @@ Basically it runs:
 
 The processing pipeline is:
 
-| Sensor | Input | Processing | Output |
-| ------ | ----- | ---------- | ------ |
-| TTL IR, serial data | SML, decoded output fro libsml | [smltextmqttprocessor.py](./smltextmqttprocessor.py) | MQTT messages |
+| Input | Processing | Output |
+| ----- | ---------- | ------ |
+| Decoded SML data from IR smart meter reader | [smltextmqttprocessor.py](./smltextmqttprocessor.py) | MQTT messages |
 
 
-## Sensor Hardware
+### Sensor Hardware
 I use the TTL IR read-write reader as specified on [volkszaehler.org](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang).
 
 
@@ -92,7 +92,7 @@ The [SML](https://de.wikipedia.org/wiki/Smart_Message_Language) data is like (al
 ```
 
 
-## Processing
+### Processing
 
 1. ./sml_server_time/sml_server_time
    | Input | Processing | Output |
@@ -112,20 +112,22 @@ The [SML](https://de.wikipedia.org/wiki/Smart_Message_Language) data is like (al
 2. smltextmqttprocessor.py
    | Input | Processing | Output |
    | ----- | ---------- | ------ |
-   | Textutal output from [sml_server_time](./sml_server_time/) | Parse heuristic, math aggregations (mean, min, max, ...);  MQTT message building | MQTT messages sent to MQTT broker |
+   | Textutal output from [sml_server_time](./sml_server_time/) | Parse heuristic, math aggregations (mean, min, max, ...);  MQTT message building | MQTT messages sent to broker |
    
-   The output is like:
-   ```
-   tele/smartmeter/time/first 11824115
-   tele/smartmeter/time/last 11824175
-   tele/smartmeter/power/total/value 1189840.5
-   tele/smartmeter/power/actual/first 241.0
-   tele/smartmeter/power/actual/last 238.0
-   tele/smartmeter/power/actual/median 242.0
-   tele/smartmeter/power/actual/mean 242
-   tele/smartmeter/power/actual/min 235.0
-   tele/smartmeter/power/actual/max 254.0
-   ```
+
+### Output
+The output on MQTT is like:
+```
+tele/smartmeter/time/first 11824115
+tele/smartmeter/time/last 11824175
+tele/smartmeter/power/total/value 1189840.5
+tele/smartmeter/power/actual/first 241.0
+tele/smartmeter/power/actual/last 238.0
+tele/smartmeter/power/actual/median 242.0
+tele/smartmeter/power/actual/mean 242
+tele/smartmeter/power/actual/min 235.0
+tele/smartmeter/power/actual/max 254.0
+```
 
 
 
