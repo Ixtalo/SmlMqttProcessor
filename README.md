@@ -94,10 +94,12 @@ The [SML](https://de.wikipedia.org/wiki/Smart_Message_Language) data is like (al
 
 ### Processing
 
-1. ./sml_server_time/sml_server_time
+1. `./sml_server_time/sml_server_time`
+
    | Input | Processing | Output |
    | ----- | ---------- | ------ |
    | TTL serial data, from smart meter | SML decoding | decoded, textual output |
+
    * See [sml_server_time/README.md](sml_server_time/README.md).
    * This binary is based on the libsml-example "sml_server", but modified to also include the *act_sensor_time* data field.
    * The output looks like
@@ -107,9 +109,10 @@ The [SML](https://de.wikipedia.org/wiki/Smart_Message_Language) data is like (al
    1-0:1.8.0*255#198927.3#Wh
    1-0:16.7.0*255#26#W
    act_sensor_time#6825875#
-   ...
    ```
-2. smltextmqttprocessor.py
+
+2. `smltextmqttprocessor.py`
+
    | Input | Processing | Output |
    | ----- | ---------- | ------ |
    | Textutal output from [sml_server_time](./sml_server_time/) | Parse heuristic, math aggregations (mean, min, max, ...);  MQTT message building | MQTT messages sent to broker |
