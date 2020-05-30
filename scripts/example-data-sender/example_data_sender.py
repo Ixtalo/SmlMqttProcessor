@@ -1,4 +1,7 @@
-#!/usr//bin/env python
+#!/usr/bin/env python3
+"""
+Simulate libsml sml_server output (decoded SML messages).
+"""
 
 import os
 import sys

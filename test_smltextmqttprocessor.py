@@ -1,5 +1,8 @@
 #!pytest
 # -*- coding: utf-8 -*-
+"""
+Unit tests for smltextmqttprocessor.py, using pytest.
+"""
 
 import io
 import pytest
