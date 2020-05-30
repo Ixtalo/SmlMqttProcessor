@@ -1,0 +1,252 @@
+
+##
+## Dokumentation eines SML Pakets
+##
+## Quelle: 2020-03-02_SFH203FA_Darlington.uart.1
+## Referenzen:
+## doc/SML/F2-2_PJM_5_Beschreibung\ SML\ Datenprotokoll\ V1.0_28.02.2011.pdf 
+## https://wiki.volkszaehler.org/hardware/channels/meters/power/edl-ehz/emh-ehz-h1
+##
+
+# Start Escape Zeichenfolge 
+1B 1B 1B 1B 
+
+# Start Übertragung Version 1 
+01 01 01 01 
+
+
+
+# SML-Message, Liste mit 6 Einträgen
+76
+	# (1) transactionId
+	05 00 BF 0C 55 
+
+	# (2) groupNo
+	62 00 
+
+	# (3) abortOnError
+	62 00 
+
+	# (4) messageBody
+	72 
+		# Nachricht 0101 = SML_PublicOpen.Res
+		63 01 01 
+
+		# SML_GetList_Res
+		# 76 = Liste mit 6 Einträgen
+		76
+			# codepage (leer)
+			01 
+			# clientID (leer)
+			01 
+			# reqFileID
+			# Der Parameter ‚reqFileId‘ bezeichnet in systemweit5 eindeutiger Form ein konkretes SML-Auftragsdatei- / SML-Antwortdatei-Tupel. [https://de.readkong.com/page/sml-smart-message-language-version-1-03-9171907?p=1]
+			05 00 3F AE C7 
+			
+			# serverId
+			# "1ISK00 xxxx xxxx"
+			0B 0A 01 49 53 4B 00 xx xx xx xx 
+
+			# actSensorTime + secIndex (8 bytes)
+			72 
+				# Typ = secIndex
+				62 01
+				# secIndex int32
+				65 00 3F AD 5F 
+
+			# password (leer)
+			62 01 
+
+	# (5) CRC16
+	63 DF 08 
+
+	# (6) endOfMsg
+	00 
+
+
+
+
+# SML-Message, Liste mit 6 Einträgen
+76
+	# (1) transactionId
+	05 00 BF 0C 56 
+
+	# (2) groupNo
+	62 00 
+
+	# (3) abortOnError
+	62 00 
+
+	# (4) messageBody
+	# Liste mit 2 Einträgen
+	72 
+	
+		# (1)
+		# Nachricht 0701 = SML_GetList.Res
+		63 07 01
+		
+		# (2)
+		# Liste mit 7 Einträgen
+		77 
+			# clientID (leer)
+			01
+			# serverId
+			# "1ISK00 xxxx xxxx"
+			0B 0A 01 49 53 4B 00 xx xx xx xx 
+			# listName?
+			07 
+			# ?
+			01
+			# ?
+			00 62 0A FF FF 
+			
+			# actSensorTime + secIndex 
+			72
+				# Typ = secIndex
+				# TL 62 -> uint8
+				62 01 
+				# TL[1] + secIndex uint32
+				# TL 65 -> uint32, big endian
+				65 00 3F AD 5F 
+			
+			# ?
+			74 
+
+
+			# valList Telegram
+			77 07 01 00 
+				## Hersteller-Kennung
+				60 32 01 01
+				# ?
+				01 
+				# ? 
+				01
+				# ?
+				01 
+				# ?
+				01 
+				# ?
+				04 49 53 4B 
+				# valueSignature (not set) 
+				01 
+
+
+			# valList Telegram
+			77 07 01 00
+				# Geräte-Identifikation
+				# Identifikationsnummer 2.1 Seriennummer 
+				# 0-0: C.1.0*255 
+				60 01 00 FF 
+				# SML start
+				01 01 01 01 
+				# ??
+				0B 0A 
+				# serverId
+				# "1ISK00 xxxx xxxx"
+				01 49 53 4B 00 xx xx xx xx
+				# valueSignature (not set) 
+				01 
+				
+
+			# valList Telegram
+			77 07 01 00 
+				# Wirk-Energie Total Bezug 
+				# 1-0: 1.8.0*255
+				01 08 00 FF 
+				# status
+				00 1C 01 04 
+				# valTime (not set)
+				01 
+				# unit (unsigned8) 1E = Wh
+				# TL 62 -> uint8
+				62 1E 
+				# scaler (int8) -1 = *10^-1 = /10
+				# TL 52 -> int8
+				52 FF 
+				# value TL + value uint32: 4777221
+				# TL 65 -> uint32, big endian
+				# 32 Bit (4 Byte) 
+				# -> 00000000 – 3B9AC9FF 
+				# -> 0.000 – 999999.999 kWh
+				65 00 48 E5 05 
+				# valueSignature (not set) 
+				01 
+
+
+			# valList Telegram
+			77 07 01 00 
+				# Aktuelle Wirkleistung
+				# OBIS: 01 00 10 07 00 FF 
+				10 07 00 FF 
+				# status?
+				01
+				# valTime?
+				01
+				# unit (TL[1] + unsigned[1]) 1B = W
+				# TL 62 -> uint8
+				62 1B 
+				# scaler (TL[1] + unsigned[1]), x1
+				52 00 
+				# value TL[1] + value int16
+				# TL 53 -> int16, big endian, 0xYY 0xZZ, 0xYY high-byte, 0xZZ low-byte
+				53 01 75 
+				## ???
+				01 01 
+				# valueSignature (not set) 
+				01 
+
+
+	# (5) CRC16
+	# TL 63 -> uint16
+	63 8E C3 
+
+	# (6) endOfMsg
+	00  
+
+
+
+
+# SML-Message, Liste mit 6 Einträgen
+76
+	# (1) transactionId
+	05 00 BF 0C 57 
+
+	# (2) groupNo
+	62 00 
+	
+	# (3) abortOnError
+	62 00 
+
+	# (4) messageBody
+	72 
+		# Nachricht 0201 = SML_PublicClose.Res
+		63 02 01 
+
+		# listSignature
+		71
+			# actGatewayTime (leer)
+			01 
+
+	# (5) crc16 (Checksumme nach CCITT-CRC16) 
+	63 DE 17
+
+	# (6) endOfMsg
+	00 
+
+
+
+# Erweiterungsbyte (bis Anzahl Byte modulo 4 = 0) 
+00 
+
+# Ende Escape Zeichenfolge 
+1B 1B 1B 1B 
+
+# Ende der Nachricht 
+1A 
+
+# Anzahl Erweiterungsbyte
+01
+
+# Checksumme gesamte Nachricht (CCITT-CRC16)
+20 C1
+
