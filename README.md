@@ -94,24 +94,26 @@ The [SML](https://de.wikipedia.org/wiki/Smart_Message_Language) data is like (al
 
 ### Processing
 
-1. `./sml_server_time/sml_server_time`
+#### Step 1 `./sml_server_time/sml_server_time`
 
-   | Input | Processing | Output |
-   | ----- | ---------- | ------ |
-   | TTL serial data, from smart meter | SML decoding | decoded, textual output |
+| Input | Processing | Output |
+| ----- | ---------- | ------ |
+| TTL serial data, from smart meter | SML decoding | decoded, textual output |
 
-   * See [sml_server_time/README.md](sml_server_time/README.md).
-   * This binary is based on the libsml-example "sml_server", but modified to also include the *act_sensor_time* data field.
-   * The output looks like
-   ```
-   1-0:96.50.1*1#ISK#
-   1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
-   1-0:1.8.0*255#198927.3#Wh
-   1-0:16.7.0*255#26#W
-   act_sensor_time#6825875#
-   ```
+* See [sml_server_time/README.md](sml_server_time/README.md).
+* This binary is based on the libsml-example "sml_server", but modified to also include the *act_sensor_time* data field.
+* The output looks like
+```
+1-0:96.50.1*1#ISK#
+1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
+1-0:1.8.0*255#198927.3#Wh
+1-0:16.7.0*255#26#W
+act_sensor_time#6825875#
+```
 
-2. `smltextmqttprocessor.py`
+This output is piped to `smltextmqttprocessor.py`.
+
+#### Step 2 `smltextmqttprocessor.py`
 
    | Input | Processing | Output |
    | ----- | ---------- | ------ |

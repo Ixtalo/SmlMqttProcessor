@@ -1,0 +1,154 @@
+<h1 id="smlmqttprocessor">SmlMqttProcessor</h1>
+<p>Process Smart Message Language (<a href="https://de.wikipedia.org/wiki/Smart_Message_Language">SML</a>) from power smart meters with SML infra-red (IR) interface.</p>
+<p>It depends heavily on the great <a href="https://github.com/volkszaehler/libsml">libsml</a> library (GPL3 license), forked from <a href="https://github.com/volkszaehler/libsml">volkszaehler/libsml</a>.</p>
+<p>Concept: - This implementation uses a Rasperry Pi Zero with an atatched serial optical <a href="https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang">TTL reader</a> to capture SML data sent by a power smart meter. - The SML processing is done by <a href="https://github.com/volkszaehler/libsml">libsml</a>. - libsml’s textual output is parsed, aggregated for a 1 minute time window and forwared as MQTT statements.</p>
+<h2 id="motivation">Motivation</h2>
+<p>I wanted to have the current power consumption of the last minute as MQTT messages.</p>
+<p>So: - Need to know the current power consumption, e.g., to detect peaks, evaluate power production by photovoltaic system, save electricity, etc. - The power grid operator installed a power smater meter which has an reading interface. The data is sent out via optical interface <em>every second</em>, encoded as SML messages. - Data for each second is to much (and can have high variance), so aggregate the data for a time window (e.g., 1 minute) to produce mean, median, min/max, etc. - Send that aggregated data as MQTT messages.</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>Python 3.5+
+<ul>
+<li>Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).</li>
+</ul></li>
+<li>python3-pip
+<ul>
+<li>For reference on actually used Python modules and versions see <a href="./requirements.freeze">requirements.freeze</a>.</li>
+</ul></li>
+<li>wget</li>
+<li><a href="https://github.com/volkszaehler/libsml">volkszaehler/libsml</a>, version <a href="https://github.com/volkszaehler/libsml/tree/6609c8117ba2c987aea386a7fffb9b4746636be6">6609c8117ba</a></li>
+</ul>
+<p>Hardware and runtime requirements: * Raspberry Pi Zero with Raspbian Jessie. * Optical TTL IR reader, directly attached to the Raspi TTL serial TX/RX GPIO pins.</p>
+<h2 id="setup-how-to">Setup &amp; How-To</h2>
+<ol type="1">
+<li><code>git clone --recurse-submodules</code> this repository
+<ul>
+<li>ATTENTION: <code>--recurse-submodules</code> is needed!</li>
+</ul></li>
+<li>Build <code>sml_server_time</code>, see <a href="sml_server_time/README.md">sml_server_time/README.md</a>.</li>
+<li>Generate Python virtual environment allowing access to the system’s Python packages:<br />
+<code>python -m virtualenv --python=python3.5 --system-site-packages venv</code></li>
+<li>Activate virtualenv:<br />
+<code>source ./venv/bin/activate</code></li>
+<li>Run in activated virtualenv and study CLI help:<br />
+<code>python smltextmqttprocessor.py --help</code></li>
+<li>Create local configuration file and adjust settings: <code>cp config.template.ini config.local.ini</code>
+<ul>
+<li>MQTT configuration: server host, port, user/password</li>
+<li>Serial port configuration</li>
+<li>Block/Window size (for data aggregation)</li>
+</ul></li>
+<li>Run in activated virtualenv:<br />
+<code>./sml_server_time/sml_server_time /dev/ttyAMA0 | python smltextmqttprocessor.py config.local.ini -</code></li>
+</ol>
+<h3 id="run-at-boot-time">Run at Boot Time</h3>
+<p>After setting up, use systemd script in <a href="./scripts/systemd/">./scripts/systemd/</a>. Basically it runs: <code>ExecStart=/bin/sh -c '/opt/SmlMqttProcessor/sml_server_time/sml_server_time /dev/ttyAMA0 | /opt/SmlMqttProcessor/venv/bin/python3 /opt/SmlMqttProcessor/smltextmqttprocessor.py -q config.local.ini -'</code></p>
+<h2 id="concept">Concept</h2>
+<p>The processing pipeline is:</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 47%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Input</th>
+<th>Processing</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Decoded SML data from IR smart meter reader</td>
+<td><a href="./smltextmqttprocessor.py">smltextmqttprocessor.py</a></td>
+<td>MQTT messages</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sensor-hardware">Sensor Hardware</h3>
+<p>I use the TTL IR read-write reader as specified on <a href="https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang">volkszaehler.org</a>.</p>
+<h3 id="input">Input</h3>
+<p>Own power smart meter model is Iskraemeco MT631. For details see <a href="https://wiki.volkszaehler.org/hardware/channels/meters/power/edl-ehz/iskraemeco_mt631">Wiki page of Volkszaehler.org</a>: * “The meter has a bidirectional IR interface in the upper right corner, which can be read by means of an IR read-write head at 9600bd, 8N1. The connection cable of the read head points down.” * “The meter outputs the data in SML without request.”</p>
+<p>The <a href="https://de.wikipedia.org/wiki/Smart_Message_Language">SML</a> data is like (also see <a href="https://github.com/devZer0/libsml-testing">libsml examples</a>):</p>
+<pre><code>1B1B1B1B010101017605013880316200620072630101760101050068
+2ABB0B0A0149534B0004325EC57262016500682793620163F9AB0076
+0501388032620062007263070177010B0A0149534B0004325EC50701
+00620AFFFF7262016500682793747707010060320101010101010449
+534B0177070100600100FF010101010B0A0149534B0004325EC50177
+070100010800FF65001C810401621E52FF65001E5A99017707010010
+0700FF0101621B5200521A01010163BF270076050138803362006200
+726302017101635567000000</code></pre>
+<h3 id="processing">Processing</h3>
+<h4 id="step-1-.sml_server_timesml_server_time">Step 1 <code>./sml_server_time/sml_server_time</code></h4>
+<table>
+<thead>
+<tr class="header">
+<th>Input</th>
+<th>Processing</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>TTL serial data, from smart meter</td>
+<td>SML decoding</td>
+<td>decoded, textual output</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>See <a href="sml_server_time/README.md">sml_server_time/README.md</a>.</li>
+<li>This binary is based on the libsml-example “sml_server”, but modified to also include the <em>act_sensor_time</em> data field.</li>
+<li>The output looks like</li>
+</ul>
+<pre><code>1-0:96.50.1*1#ISK#
+1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
+1-0:1.8.0*255#198927.3#Wh
+1-0:16.7.0*255#26#W
+act_sensor_time#6825875#</code></pre>
+<p>This output is piped to <code>smltextmqttprocessor.py</code>.</p>
+<h4 id="step-2-smltextmqttprocessor.py">Step 2 <code>smltextmqttprocessor.py</code></h4>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 47%" />
+<col style="width: 28%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Input</th>
+<th>Processing</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Textutal output from <a href="./sml_server_time/">sml_server_time</a></td>
+<td>Parse heuristic, math aggregations (mean, min, max, …); MQTT message building</td>
+<td>MQTT messages sent to broker</td>
+</tr>
+</tbody>
+</table>
+<h3 id="output">Output</h3>
+<p>The output on MQTT is like:</p>
+<pre><code>tele/smartmeter/time/first 11824115
+tele/smartmeter/time/last 11824175
+tele/smartmeter/power/total/value 1189840.5
+tele/smartmeter/power/actual/first 241.0
+tele/smartmeter/power/actual/last 238.0
+tele/smartmeter/power/actual/median 242.0
+tele/smartmeter/power/actual/mean 242
+tele/smartmeter/power/actual/min 235.0
+tele/smartmeter/power/actual/max 254.0</code></pre>
+<h2 id="sml-links">SML Links</h2>
+<ul>
+<li>https://github.com/volkszaehler/libsml</li>
+<li>https://de.wikipedia.org/wiki/Smart_Message_Language</li>
+<li>https://www.msxfaq.de/sonst/bastelbude/smartmeter_d0_sml_protokoll.htm</li>
+<li>https://wiki.volkszaehler.org/software/sml</li>
+<li>Python, https://github.com/smarthomeNG/plugins/blob/master/sml/<strong>init</strong>.py</li>
+<li>SML-Examples: https://github.com/devZer0/libsml-testing</li>
+</ul>
+<h2 id="license">License</h2>
+<p>AGPL3, see <a href="LICENSE.md">LICENSE.md</a>.</p>
