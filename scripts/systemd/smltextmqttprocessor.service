@@ -1,0 +1,17 @@
+[Unit]
+Description=SML Smart Meter MQTT
+
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c '/opt/SmlMqttProcessor/sml_server_time/sml_server_time /dev/ttyAMA0 | /opt/SmlMqttProcessor/venv/bin/python3 /opt/SmlMqttProcessor/smltextmqttprocessor.py -q config.local.ini -'
+Nice=-5
+User=smartmeter
+Restart=on-failure
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=smartmeter
+
+
+[Install]
+WantedBy=multi-user.target
