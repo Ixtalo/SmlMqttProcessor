@@ -26,7 +26,7 @@ def __processfile(filepath, window_size):
     global n
 
     ## call external binary and capture STDOUT
-    cmd = "%s %s" % (os.path.join(__script_dir, './sml_server_time/sml_server_time'), filepath)
+    cmd = "%s %s" % (os.path.join(__script_dir, '../sml_server_time/sml_server_time'), filepath)
     proc = Popen(shlex.split(cmd), stdout=PIPE)
 
     ## reset counter
@@ -54,7 +54,7 @@ def test_processing_loop_exampledatafiles_window1():
         'ISKRA_MT175_eHZ.bin': 10,
         'ISKRA_MT691_eHZ-MS2020.bin': 18
     }
-    for filepath in iglob(os.path.join(__script_dir, 'example_data/*.bin')):
+    for filepath in iglob(os.path.join(__script_dir, '*.bin')):
         print(filepath)
         filename = os.path.basename(filepath)
         actual = __processfile(filepath, window_size=1)
@@ -73,7 +73,7 @@ def test_processing_loop_exampledatafiles_window2():
         'ISKRA_MT175_eHZ.bin': 5,
         'ISKRA_MT691_eHZ-MS2020.bin': 9
     }
-    for filepath in iglob(os.path.join(__script_dir, 'example_data/*.bin')):
+    for filepath in iglob(os.path.join(__script_dir, '*.bin')):
         print(filepath)
         filename = os.path.basename(filepath)
         actual = __processfile(filepath, window_size=2)
@@ -92,7 +92,7 @@ def test_processing_loop_exampledatafiles_window15():
         'ISKRA_MT175_eHZ.bin': 1,
         'ISKRA_MT691_eHZ-MS2020.bin': 2
     }
-    for filepath in iglob(os.path.join(__script_dir, 'example_data/*.bin')):
+    for filepath in iglob(os.path.join(__script_dir, '*.bin')):
         print(filepath)
         filename = os.path.basename(filepath)
         actual = __processfile(filepath, window_size=15)
