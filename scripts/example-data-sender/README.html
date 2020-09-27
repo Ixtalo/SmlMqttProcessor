@@ -1,0 +1,35 @@
+<h1 id="example-data-sender">example-data-sender</h1>
+<p>Simple Python script to simulate libsml’s sml_server textual, decoded output. It can be used as input to <code>smltextmqttprocessor.py</code>.</p>
+<h2 id="usage">Usage</h2>
+<p><code>python3 scripts/example-data-sender/example_data_sender.py | python3 smltextmqttprocessor.py --no-mqtt --debug config.local.ini -</code></p>
+<p>Output:</p>
+<pre><code>(venv) SmlMqttProcessor git:(master) ✗ python3 scripts/example-data-sender/example_data_sender.py | python3 smltextmqttprocessor.py --no-mqtt --debug config.local.ini -
+2020-09-27 07:45:05 DEBUG    root       ---- ENABLING DEBUG OUTPUT!!! -------
+2020-09-27 07:45:05 DEBUG    root       {&#39;--debug&#39;: True,
+ &#39;--help&#39;: False,
+ &#39;--no-mqtt&#39;: True,
+ &#39;--quiet&#39;: False,
+ &#39;--verbose&#39;: False,
+ &#39;--version&#39;: False,
+ &#39;&lt;config-file.ini&gt;&#39;: &#39;config.local.ini&#39;,
+ &#39;&lt;input&gt;&#39;: &#39;-&#39;}
+2020-09-27 07:45:05 INFO     root       Config file: /home/user/SmlMqttProcessor/config.local.ini
+2020-09-27 07:45:05 INFO     root       Block size: 3
+2020-09-27 07:45:05 INFO     root       &lt;_io.TextIOWrapper name=&#39;&lt;stdin&gt;&#39; mode=&#39;r&#39; encoding=&#39;utf-8&#39;&gt;
+2020-09-27 07:45:05 DEBUG    root       waiting for header line...
+2020-09-27 07:45:05 DEBUG    root       header line found
+2020-09-27 07:45:05 DEBUG    root       next header found
+2020-09-27 07:45:05 DEBUG    root       data: {&#39;actual&#39;: 26, &#39;total&#39;: 198927.3, &#39;time&#39;: 6825876}
+2020-09-27 07:45:05 DEBUG    root       waiting for header line...
+2020-09-27 07:45:05 DEBUG    root       header line found
+2020-09-27 07:45:05 DEBUG    root       next header found
+2020-09-27 07:45:05 DEBUG    root       data: {&#39;actual&#39;: 27, &#39;total&#39;: 198927.4, &#39;time&#39;: 6825879}
+2020-09-27 07:45:05 DEBUG    root       waiting for header line...
+2020-09-27 07:45:05 DEBUG    root       header line found
+2020-09-27 07:45:05 DEBUG    root       next header found
+2020-09-27 07:45:05 DEBUG    root       data: {&#39;actual&#39;: 27, &#39;total&#39;: 198927.4, &#39;time&#39;: 6825882}
+2020-09-27 07:45:05 DEBUG    root       waiting for header line...
+2020-09-27 07:45:05 DEBUG    root       header line found
+2020-09-27 07:45:05 DEBUG    root       next header found
+2020-09-27 07:45:05 DEBUG    root       data: {&#39;actual&#39;: 27, &#39;total&#39;: 198927.4, &#39;time&#39;: 6825885}
+NO-MQTT: {&#39;total&#39;: [198927.3, 198927.4, 198927.4, 198927.4], &#39;actual&#39;: [26, 27, 27, 27], &#39;time&#39;: [6825876, 6825879, 6825882, 6825885]}</code></pre>

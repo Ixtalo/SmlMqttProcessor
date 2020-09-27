@@ -52,28 +52,62 @@ import sys
 import time
 from codecs import open
 
+from docopt import docopt
+
 ## https://pypi.org/project/paho-mqtt/#usage-and-api
 import paho.mqtt.client as mqtt
 ## PySML, https://pypi.org/project/pysml/
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
-from docopt import docopt
 
-__version__ = "1.4"
+__version__ = "1.5"
 __date__ = "2020-04-21"
-__updated__ = "2020-04-26"
+__updated__ = "2020-09-27"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
 __status__ = "Production"
 
-SML_POWER_ACTUAL = '1-0:16.7.0*255'
-SML_POWER_TOTAL = '1-0:1.8.0*255'
-SML_SENSOR_TIME = 'act_sensor_time'
+
+########################################################################
+## Configure the following to suit your actual smart meter configuration
+##
+
+## SML OBIS fields
+## dictionary: MQTT-topic --> OBIS-code
+## for OBIS codes see e.g. https://wiki.volkszaehler.org/software/obis
+SML_FIELDS = {
+    'total': '1-0:1.8.0*255',           ## Zählerstand Bezug
+    'total_tariff1': '1-0:1.8.1*255',   ## Zählerstand Bezug Tarif 1
+    'total_tariff2': '1-0:1.8.2*255',   ## Zählerstand Bezug Tarif 2
+    'total_tariff3': '1-0:1.8.3*255',   ## Zählerstand Bezug Tarif 3
+    'total_tariff4': '1-0:1.8.4*255',   ## Zählerstand Bezug Tarif 4
+
+    'total_export': '1-0:2.8.0*255',           ## Zählerstand Lieferung
+    'total_export_tariff1': '1-0:2.8.1*255',   ## Zählerstand Lieferung Tarif 1
+    'total_export_tariff2': '1-0:2.8.2*255',   ## Zählerstand Lieferung Tarif 2
+    'total_export_tariff3': '1-0:2.8.3*255',   ## Zählerstand Lieferung Tarif 3
+    'total_export_tariff4': '1-0:2.8.4*255',   ## Zählerstand Lieferung Tarif 4
+
+    'actual': '1-0:16.7.0*255',         ## Leistung (Momentan)
+    'actual_l1': '1-0:36.7.0*255',      ## Leistung L1 (Momentan)
+    'actual_l2': '1-0:56.7.0*255',      ## Leistung L2 (Momentan)
+    'actual_l3': '1-0:76.7.0*255',      ## Leistung L3 (Momentan)
+
+    'time': 'act_sensor_time'
+}
+
+## MQTT topic prefix
 MQTT_TOPIC_PREFIX = 'tele/smartmeter'
 
+## SML headers as list/tuple for header-detection heuristic
+## (OBIS code for manufacturer identification)
+SML_HEADERS = ('1-0:96.50.1*1#', '129-129:199.130.3*255#')
+
+##
+########################################################################
+
 DEBUG = 0
-TESTRUN = 0
 PROFILE = 0
 __script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -83,63 +117,97 @@ if sys.version_info < (3, 0):
     sys.exit(1)
 
 
-# class DummyMqtt:
-#    def connect(self, host, port=1883, keepalive=60, bind_address=""):
-#        logging.info("DummyMqtt: %s:%d", host, port)
-#
-#    def publish(self, topic, payload=None, qos=0, retain=False):
-#        logging.info("DummyMqtt: %s %s", topic, payload)
-
-
 def check_stream_packet_begin(istream):
-    line = istream.readline(100).strip()
-    if not line or not line.startswith('1-0:96.50.1*1#') or line.startswith('#'):
-        return False
-    ## yes, this is the starting line
-    return True
-
-
-def sml_getvalue_heuristic(istream, field_startswith):
+    """
+    Try to find a header line in the data input stream to find
+    the beginning of a SML messages block (in sml_server_time output).
+    """
     if istream.seekable():
         pos = istream.tell()
     else:
         ## only for PyCharm code review...
         pos = 0
-    line = istream.readline().strip()
-    value = None
-    if line.startswith(field_startswith):
-        ## found a matching line, take the value from this line
-        _, value, unit = line.split('#', 2)
-    else:
+
+    ## read first line or max 100 bytes
+    line = istream.readline(100).strip()
+
+    ## check that line for header string
+    result = False
+    for header in SML_HEADERS:
+        if line.startswith(header):
+            ## yes, this is the starting line
+            result = True
+            break
+
+    if istream.seekable():
+        ## no such field found, rollback in stream
+        istream.seek(pos)
+
+    return result
+
+
+def parse_stream(istream):
+    """
+    Parse the input stream (output from libsml's sml_server_time) and try
+    to find various pre-defined SML fields.
+    """
+
+    logging.debug('waiting for header line...')
+    while not check_stream_packet_begin(istream):
+        time.sleep(0.01)
+
+    logging.debug('header line found')
+    istream.readline()  ## skip the current header line
+
+    result = {}
+    pos = -1
+    while True:
         if istream.seekable():
-            ## no such field found, rollback in stream
-            istream.seek(pos)
-    return value
+            oldpos = pos
+            pos = istream.tell()
+            if oldpos == pos:
+                ## EOF?
+                break
 
+        ## check for next header line
+        header_found = check_stream_packet_begin(istream)
+        if header_found:
+            logging.debug('next header found')
+            if istream.seekable():
+                istream.seek(pos)
+            break
 
-def parse_stream(istream, a_times, a_total, a_actual):
-    istream.readline()  ## do not use line with serial number ("1-0:96.1.0*255#...#")
+        line = istream.readline().strip()
 
-    ## "1-0:1.8.0*255#837566.4#Wh"
-    value = sml_getvalue_heuristic(istream, SML_POWER_TOTAL)
-    logging.debug("sml_getvalue_heuristic SML_POWER_TOTAL: %s", value)
-    if value:
-        a_total.append(float(value))
+        for name, pattern in SML_FIELDS.items():
+            if line.startswith(pattern):
+                ## found a matching line, take the value from this line
+                _, value, _ = line.split('#', 2)    ## (OBIS code, value, unit)
 
-    ## "1-0:16.7.0*255#273#W"
-    value = sml_getvalue_heuristic(istream, SML_POWER_ACTUAL)
-    logging.debug("sml_getvalue_heuristic SML_POWER_ACTUAL: %s", value)
-    if value:
-        a_actual.append(float(value))
+                ## try to parse as float and int
+                try:
+                    value = int(value)
+                except ValueError:
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass
 
-    ## "act_sensor_time#7710226#"
-    value = sml_getvalue_heuristic(istream, SML_SENSOR_TIME)
-    logging.debug("sml_getvalue_heuristic SML_POWER_ACTUAL: %s", value)
-    if value:
-        a_times.append(int(value))
+                ## NOTE: duplicate lines of same type would overwrite old values
+                ## until a new header line occurs (i.e., next SML message block)
+                result[name] = value
+
+        ## do not loop too fast
+        ## the incoming text from the serial line isn't that fast
+        time.sleep(0.01)
+
+    return result
 
 
 class MyMqtt:
+    """
+    MQTT publishing.
+    """
 
     def __init__(self, config):
         self.client = None
@@ -148,10 +216,12 @@ class MyMqtt:
 
     def connect(self):
 
+        # noinspection PyUnusedLocal,PyShadowingNames
         def on_connect(client, userdata, flags, rc):
             logging.info("MQTT connected: %s (%d)", mqtt.connack_string(rc), rc)
             self.connected = True
 
+        # noinspection PyUnusedLocal,PyShadowingNames
         def on_disconnect(client, userdata, rc):
             self.connected = False
             if rc == mqtt.MQTT_ERR_SUCCESS:
@@ -181,7 +251,8 @@ class MyMqtt:
         wait_time = 1
         while not self.connected:
             try:
-                client.connect(self.config.get('Mqtt', 'host'), port=self.config.getint('Mqtt', 'port', fallback=1883))
+                client.connect(self.config.get('Mqtt', 'host'),
+                               port=self.config.getint('Mqtt', 'port', fallback=1883))
                 ## loop_start() is necessary for on_* to work
                 ## (asynchronous handling starts)
                 client.loop_start()
@@ -199,29 +270,56 @@ class MyMqtt:
         self.client.disconnect()
         self.connected = False
 
-    def send_data(self, a_times, a_total, a_actual):
+    @staticmethod
+    def construct_mqttdata(field2values):
+        """
+        Construct a 2-dimensinal dictionary:
+           fieldname --> value-type --> value
+
+        Example:
+           total --> mean --> value
+           result['tptal']['mean'] := mean(collected-values)
+
+        :param field2values: collected data, dictionary: fieldname --> [data points]
+        :return: 2-dim dictionary fieldname --> value-type --> value
+        """
+        result = {}
+        ## special handling for time field
+        if 'time' in field2values:
+            result['time'] = {}
+            result['time']['first'] = field2values['time'][0]
+            result['time']['last'] = field2values['time'][-1]
+        for name, values in field2values.items():
+            if name == 'time':
+                ## do not output math statistics such as below for time field
+                continue
+            if not values:
+                ## could be empty, e.g. if no such data has been observed
+                continue
+            result[name] = {}
+            result[name]['value'] = values[-1]
+            result[name]['first'] = values[0]
+            result[name]['last'] = values[-1]
+            result[name]['median'] = statistics.median(values)
+            result[name]['mean'] = round(statistics.mean(values))
+            result[name]['min'] = min(values)
+            result[name]['max'] = max(values)
+        return result
+
+    def send_data(self, field2values):
+        """
+        Sends (publish) data to MQTT.
+        :param field2values: collected data, dictionary: fieldname --> [data points]
+        :return: Nothing
+        """
         if not self.connected:
             self.connect()
 
-        ## MQTT publishing
-        if a_times:  ## times array could actually be empty!
-            self.client.publish("%s/time/first" % MQTT_TOPIC_PREFIX, a_times[0])
-            self.client.publish("%s/time/last" % MQTT_TOPIC_PREFIX, a_times[-1])
-        self.client.publish("%s/power/total/value" % MQTT_TOPIC_PREFIX, a_total[-1])
-        self.client.publish("%s/power/actual/first" % MQTT_TOPIC_PREFIX, a_actual[0])
-        self.client.publish("%s/power/actual/last" % MQTT_TOPIC_PREFIX, a_actual[-1])
-        self.client.publish("%s/power/actual/median" % MQTT_TOPIC_PREFIX, statistics.median(a_actual))
-        self.client.publish("%s/power/actual/mean" % MQTT_TOPIC_PREFIX, round(statistics.mean(a_actual)))
-        self.client.publish("%s/power/actual/min" % MQTT_TOPIC_PREFIX, min(a_actual))
-        self.client.publish("%s/power/actual/max" % MQTT_TOPIC_PREFIX, max(a_actual))
-        # client.publish("%s/power/actual/percentile20" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 20))
-        # client.publish("%s/power/actual/percentile80" % MQTT_TOPIC_PREFIX, np.percentile(a_actual, 80))
-
-        ## check if arrays contain the same amount of elements
-        if len(a_actual) != len(a_total):
-            ## varying lengths! report that!
-            self.client.publish("%s/block/total" % MQTT_TOPIC_PREFIX, len(a_total))
-            self.client.publish("%s/block/actual" % MQTT_TOPIC_PREFIX, len(a_actual))
+        mqttdata = self.construct_mqttdata(field2values)
+        for name, subname_value in mqttdata.items():
+            for subname, value in subname_value.items():
+                topic = "%s/%s/%s" % (MQTT_TOPIC_PREFIX, name, subname)
+                self.client.publish(topic, value)
 
         self.disconnect()
 
@@ -274,42 +372,50 @@ def main():
         istream_size = os.stat(arg_input).st_size
     logging.info(istream)
 
-    ## containers to hold categorical data points
-    a_total = []
-    a_actual = []
-    a_times = []
+    ## collected data
+    ## dictionary: fieldname --> [data points]
+    field2values = {}
+
+    def mqtt_or_println(mqttdata):
+        if arg_no_mqtt:
+            print("NO-MQTT:", mqttdata)
+        else:
+            mymqtt.send_data(mqttdata)
 
     ## main loop
     while True:
         try:
-            if len(a_total) > block_size:
-                if arg_no_mqtt:
-                    print(a_times, a_total, a_actual)
-                else:
-                    mymqtt.send_data(a_times, a_total, a_actual)
+            ## check if we filled the block/window
+            ## (check length of first container)
+            if field2values and len(field2values[list(field2values.keys())[0]]) > block_size:
+                mqtt_or_println(field2values)
                 ## reset containers
-                a_total = []
-                a_actual = []
-                a_times = []
+                field2values = {}
 
-            ## 1-0:96.50.1*1#ISK#
-            ## 1-0:96.1.0*255#0a 01 49 53 4b 01 23 45 67 89 #
-            ## 1-0:1.8.0*255#837566.4#Wh
-            ## 1-0:16.7.0*255#273#W
-            ## act_sensor_time#7710218#    <-- special/own version of sml_server!
-            if check_stream_packet_begin(istream):
-                parse_stream(istream, a_times, a_total, a_actual)
-            else:
-                ## some grace time to give the smartmeter time to send again (periodically very 1 sec)
-                logging.debug("Nothing found, trying again...")
-                time.sleep(0.3)
+            ## parse libsml's (sml_server_time) textual output
+            data = parse_stream(istream)
+            logging.debug("data: %s", data)
 
-            ## if this is a file stream then break when EOF is reached
+            ## store in array containers
+            for name, value in data.items():
+                if name not in field2values:
+                    ## initialize container for this very field
+                    field2values[name] = []
+                field2values[name].append(value)
+
+            ## if this is a file stream (seekable) then break when EOF is reached
+            # noinspection PyChainedComparisons
             if istream_size > 0 and istream.seekable() and istream.tell() >= istream_size:
+                logging.debug('EOF reached, stopping.')
+                mqtt_or_println(field2values)
                 break
+
+            time.sleep(0.01)
+
         except Exception as ex:
             ## this should not happen...
             logging.exception(ex)
+            time.sleep(1)
 
     return 0
 
@@ -317,15 +423,12 @@ def main():
 if __name__ == "__main__":
     if DEBUG:
         sys.argv.append("--debug")
-    if TESTRUN:
-        import doctest
-        doctest.testmod()
     if PROFILE:
         import cProfile
         import pstats
         profile_filename = __file__ + '.profile.bin'
         cProfile.run('main()', profile_filename)
-        with open("%s.txt" % profile_filename, "wb") as statsfp:
+        with open("%s.txt" % profile_filename, "w") as statsfp:
             p = pstats.Stats(profile_filename, stream=statsfp)
             stats = p.strip_dirs().sort_stats('cumulative')
             stats.print_stats()

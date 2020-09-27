@@ -143,13 +143,13 @@ The output on MQTT is like:
 ```
 tele/smartmeter/time/first 11824115
 tele/smartmeter/time/last 11824175
-tele/smartmeter/power/total/value 1189840.5
-tele/smartmeter/power/actual/first 241.0
-tele/smartmeter/power/actual/last 238.0
-tele/smartmeter/power/actual/median 242.0
-tele/smartmeter/power/actual/mean 242
-tele/smartmeter/power/actual/min 235.0
-tele/smartmeter/power/actual/max 254.0
+tele/smartmeter/total/value 1189840.5
+tele/smartmeter/actual/first 241.0
+tele/smartmeter/actual/last 238.0
+tele/smartmeter/actual/median 242.0
+tele/smartmeter/actual/mean 242
+tele/smartmeter/actual/min 235.0
+tele/smartmeter/actual/max 254.0
 ```
 
 
@@ -162,6 +162,7 @@ tele/smartmeter/power/actual/max 254.0
 * https://wiki.volkszaehler.org/software/sml
 * Python, https://github.com/smarthomeNG/plugins/blob/master/sml/__init__.py
 * SML-Examples: https://github.com/devZer0/libsml-testing
+* OBIS Codes: https://wiki.volkszaehler.org/software/obis
 
 
 
