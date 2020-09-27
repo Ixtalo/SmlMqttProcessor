@@ -1,22 +1,8 @@
+## `pip freeze --local` on RaspiZero with Raspbian GNU/Linux 8 (jessie), Python 3.5.3
 async-timeout==3.0.1
 bitstring==3.1.6
-decorator==4.0.11
 docopt==0.6.2
-ipython==5.1.0
-ipython-genutils==0.1.0
-numpy==1.12.1
 paho-mqtt==1.5.0
-pexpect==4.2.1
-pickleshare==0.7.4
 pkg-resources==0.0.0
-prompt-toolkit==1.0.9
-ptyprocess==0.5.1
-Pygments==2.2.0
-pyserial==3.2.1
 pyserial-asyncio==0.4
 pysml==0.0.2
-simplegeneric==0.8.1
-six==1.10.0
-traitlets==4.3.1
-virtualenv==15.1.0
-wcwidth==0.1.7
