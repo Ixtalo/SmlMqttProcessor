@@ -221,7 +221,7 @@ class TestMqtt:
 
         def publish_dummy(client, topic, payload=None, qos=0, retain=False):
             print(topic, payload)
-            assert topic.startswith(stmp.MQTT_TOPIC_PREFIX)
+            assert topic.startswith('tele/smartmeter')
             if topic == 'tele/smartmeter/time/first':
                 assert payload == 111
             elif topic == 'tele/smartmeter/time/last':
