@@ -51,6 +51,7 @@ import statistics
 import sys
 import time
 from codecs import open
+from pprint import pprint
 
 from docopt import docopt
 
@@ -60,7 +61,7 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.5"
+__version__ = "1.6"
 __date__ = "2020-04-21"
 __updated__ = "2020-09-27"
 __author__ = "Ixtalo"
@@ -93,6 +94,7 @@ SML_FIELDS = {
     'actual_l1': '1-0:36.7.0*255',      ## Leistung L1 (Momentan)
     'actual_l2': '1-0:56.7.0*255',      ## Leistung L2 (Momentan)
     'actual_l3': '1-0:76.7.0*255',      ## Leistung L3 (Momentan)
+    'actual_170': '1-0:1.7.0*255',      ## Wirkleistung
 
     'time': 'act_sensor_time'
 }
@@ -115,93 +117,6 @@ __script_dir = os.path.dirname(os.path.realpath(__file__))
 if sys.version_info < (3, 0):
     sys.stderr.write("Minimum required version is Python 3.x!\n")
     sys.exit(1)
-
-
-def check_stream_packet_begin(istream):
-    """
-    Try to find a header line in the data input stream to find
-    the beginning of a SML messages block (in sml_server_time output).
-    """
-    if istream.seekable():
-        pos = istream.tell()
-    else:
-        ## only for PyCharm code review...
-        pos = 0
-
-    ## read first line or max 100 bytes
-    line = istream.readline(100).strip()
-
-    ## check that line for header string
-    result = False
-    for header in SML_HEADERS:
-        if line.startswith(header):
-            ## yes, this is the starting line
-            result = True
-            break
-
-    if istream.seekable():
-        ## no such field found, rollback in stream
-        istream.seek(pos)
-
-    return result
-
-
-def parse_stream(istream):
-    """
-    Parse the input stream (output from libsml's sml_server_time) and try
-    to find various pre-defined SML fields.
-    """
-
-    logging.debug('waiting for header line...')
-    while not check_stream_packet_begin(istream):
-        time.sleep(0.01)
-
-    logging.debug('header line found')
-    istream.readline()  ## skip the current header line
-
-    result = {}
-    pos = -1
-    while True:
-        if istream.seekable():
-            oldpos = pos
-            pos = istream.tell()
-            if oldpos == pos:
-                ## EOF?
-                break
-
-        ## check for next header line
-        header_found = check_stream_packet_begin(istream)
-        if header_found:
-            logging.debug('next header found')
-            if istream.seekable():
-                istream.seek(pos)
-            break
-
-        line = istream.readline().strip()
-
-        for name, pattern in SML_FIELDS.items():
-            if line.startswith(pattern):
-                ## found a matching line, take the value from this line
-                _, value, _ = line.split('#', 2)    ## (OBIS code, value, unit)
-
-                ## try to parse as float and int
-                try:
-                    value = int(value)
-                except ValueError:
-                    try:
-                        value = float(value)
-                    except ValueError:
-                        pass
-
-                ## NOTE: duplicate lines of same type would overwrite old values
-                ## until a new header line occurs (i.e., next SML message block)
-                result[name] = value
-
-        ## do not loop too fast
-        ## the incoming text from the serial line isn't that fast
-        time.sleep(0.01)
-
-    return result
 
 
 class MyMqtt:
@@ -324,6 +239,130 @@ class MyMqtt:
         self.disconnect()
 
 
+def convert_messages2records(messages):
+    """
+    Convert a list of message-dictionaries to a dictionary with value-lists.
+    This is:
+        [ {a:11, b:12}, {a:21, b:22}, ... ]  --> {a:[11,21], b:[12,22]}
+
+    :param messages:
+    :return:
+    """
+    records = {}
+    for message in messages:
+        for key, value in message.items():
+            if key in records:
+                records[key].append(value)
+            else:
+                records[key] = [value]  ## start a new list
+    return records
+
+
+def check_stream_packet_begin(line):
+    """
+    Check if the given string line contains a SML header indicating
+    a new message block.
+    :param line: line (string)
+    :return: True if begin of new message
+    """
+    for header in SML_HEADERS:
+        if line.startswith(header):
+            ## yes, this is the starting line
+            return True
+    return False
+
+
+def parse_line(line):
+    """
+    Parse a single SML line.
+    :param line: SML message line
+    :return: (fieldname, value) tuple according to SML_FIELDS
+    """
+    if not line:
+        return None
+    for name, pattern in SML_FIELDS.items():
+        if line.startswith(pattern):
+            ## found a matching line, take the value from this line
+            _, value, _ = line.split('#', 2)  ## (OBIS code, value, unit)
+
+            ## detect int/float values
+            try:
+                value = int(value)
+            except ValueError:
+                try:
+                    value = float(value)
+                except ValueError:
+                    pass
+            return name, value
+    return None
+
+
+def processing_loop(istream, window_size, callback, timeout=0):
+    """
+    Main processing loop on input stream.
+    If size of rolling window is reached then call handler function mqtt_or_println.
+    A timeout can be specified to stop after n seconds of no data (e.g. for STDIN).
+    
+    :param istream: input stream
+    :param window_size: rolling window size, size of aggregation window
+    :param callback: reference to messages handling callback function
+    :param timeout: timeout in seconds, 0 for no timeout
+    :return: Nothing
+    """
+    message = {}
+    messages = []
+    n_nodata = 0
+    while True:
+        line = istream.readline().strip()
+        if not line:
+            n_nodata += 1
+            if timeout and n_nodata >= timeout:
+                logging.warning("#%d times no data observed, timeout hit, aborting!", n_nodata)
+                messages.append(message)
+                callback(messages)
+                break
+            logging.debug("No data observed...waiting 1 second...")
+            time.sleep(1)
+
+        if type(line) is bytes:
+            ## make sure line is a string, not bytes
+            line = line.decode()
+
+        ## check if this is a header line, i.e. beginning of new message block
+        if check_stream_packet_begin(line):
+            if message:     ## initial loops have empty message...
+                ## record current message
+                messages.append(message)
+                logging.debug("message: %s", message)
+
+            ## new header line, new message
+            message = {}
+
+            ## check if we filled the window
+            if len(messages) >= window_size:
+                logging.debug("window filled (#%d), handling...", window_size)
+                ## handle all messages
+                callback(messages)
+                ## start a new collection
+                messages = []
+
+            ## current header-line is done, proceed to next line
+            continue
+
+        ## parse line and add it to current message
+        try:
+            result = parse_line(line)
+            if result:
+                fieldname, value = result
+                ## NOTE: duplicate lines of same type would overwrite old values
+                ## until a new header line occurs (i.e., next SML message block)
+                message[fieldname] = value
+        except ValueError as ex:
+            logging.error("Invalid message '%s': %s", line, ex)
+
+        time.sleep(0.01)
+
+
 def main():
     arguments = docopt(__doc__, version="SmlTextMqttProcessor %s (%s)" % (__version__, __updated__))
     # print(arguments)
@@ -360,62 +399,28 @@ def main():
     mymqtt = MyMqtt(config)
 
     ## rolling window period
-    block_size = config.getint(configparser.DEFAULTSECT, 'block_size')
-    logging.info('Block size: %d', block_size)
+    window_size = config.getint(configparser.DEFAULTSECT, 'block_size')
+    logging.info('Aggregation/rolling window size: %d', window_size)
 
     ## input stream
     if arg_input == '-':
         istream = sys.stdin
-        istream_size = -1
     else:
         istream = open(arg_input)
-        istream_size = os.stat(arg_input).st_size
-    logging.info(istream)
+    logging.info("Input stream: %s", istream)
 
-    ## collected data
-    ## dictionary: fieldname --> [data points]
-    field2values = {}
-
-    def mqtt_or_println(mqttdata):
+    def mqtt_or_println(messages):
+        records = convert_messages2records(messages)
         if arg_no_mqtt:
-            print("NO-MQTT:", mqttdata)
+            mqttdata = MyMqtt.construct_mqttdata(records)
+            print('mqttdata:')
+            pprint(mqttdata)
         else:
-            mymqtt.send_data(mqttdata)
+            mymqtt.send_data(records)
 
-    ## main loop
-    while True:
-        try:
-            ## check if we filled the block/window
-            ## (check length of first container)
-            if field2values and len(field2values[list(field2values.keys())[0]]) > block_size:
-                mqtt_or_println(field2values)
-                ## reset containers
-                field2values = {}
-
-            ## parse libsml's (sml_server_time) textual output
-            data = parse_stream(istream)
-            logging.debug("data: %s", data)
-
-            ## store in array containers
-            for name, value in data.items():
-                if name not in field2values:
-                    ## initialize container for this very field
-                    field2values[name] = []
-                field2values[name].append(value)
-
-            ## if this is a file stream (seekable) then break when EOF is reached
-            # noinspection PyChainedComparisons
-            if istream_size > 0 and istream.seekable() and istream.tell() >= istream_size:
-                logging.debug('EOF reached, stopping.')
-                mqtt_or_println(field2values)
-                break
-
-            time.sleep(0.01)
-
-        except Exception as ex:
-            ## this should not happen...
-            logging.exception(ex)
-            time.sleep(1)
+    ## main processing loop on input stream
+    ## if size of rolling window is reached then call handler function mqtt_or_println
+    processing_loop(istream, window_size, mqtt_or_println)
 
     return 0
 
