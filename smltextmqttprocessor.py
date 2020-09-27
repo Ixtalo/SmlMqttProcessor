@@ -61,7 +61,7 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.6"
+__version__ = "1.6.2"
 __date__ = "2020-04-21"
 __updated__ = "2020-09-27"
 __author__ = "Ixtalo"
@@ -98,9 +98,6 @@ SML_FIELDS = {
 
     'time': 'act_sensor_time'
 }
-
-## MQTT topic prefix
-MQTT_TOPIC_PREFIX = 'tele/smartmeter'
 
 ## SML headers as list/tuple for header-detection heuristic
 ## (OBIS code for manufacturer identification)
@@ -164,10 +161,11 @@ class MyMqtt:
         ## try-to-connect loop
         client.connected = False
         wait_time = 1
+        host = self.config.get('Mqtt', 'host', fallback='localhost')
+        port = self.config.getint('Mqtt', 'port', fallback=1883)
         while not self.connected:
             try:
-                client.connect(self.config.get('Mqtt', 'host'),
-                               port=self.config.getint('Mqtt', 'port', fallback=1883))
+                client.connect(host, port=port)
                 ## loop_start() is necessary for on_* to work
                 ## (asynchronous handling starts)
                 client.loop_start()
@@ -230,10 +228,11 @@ class MyMqtt:
         if not self.connected:
             self.connect()
 
+        topic_prefix = self.config.get('Mqtt', 'topic_prefix', fallback='tele/smartmeter')
         mqttdata = self.construct_mqttdata(field2values)
         for name, subname_value in mqttdata.items():
             for subname, value in subname_value.items():
-                topic = "%s/%s/%s" % (MQTT_TOPIC_PREFIX, name, subname)
+                topic = "%s/%s/%s" % (topic_prefix, name, subname)
                 self.client.publish(topic, value)
 
         self.disconnect()
