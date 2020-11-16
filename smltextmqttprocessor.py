@@ -50,6 +50,7 @@ import os
 import statistics
 import sys
 import time
+import json
 from codecs import open
 from pprint import pprint
 
@@ -122,6 +123,10 @@ class MyMqtt:
     """
 
     def __init__(self, config):
+        """
+        MQTT publishing
+        :param config: ConfigParser object, e.g. from config.ini
+        """
         self.client = None
         self.config = config
         self.connected = False
@@ -219,7 +224,7 @@ class MyMqtt:
             result[name]['max'] = max(values)
         return result
 
-    def send_data(self, field2values):
+    def send(self, field2values):
         """
         Sends (publish) data to MQTT.
         :param field2values: collected data, dictionary: fieldname --> [data points]
@@ -229,11 +234,20 @@ class MyMqtt:
             self.connect()
 
         topic_prefix = self.config.get('Mqtt', 'topic_prefix', fallback='tele/smartmeter')
+        single = self.config.getboolean('Mqtt', 'single_topic', fallback='false')
+
+        ## construct 2-dim dictionary fieldname --> value-type --> value
         mqttdata = self.construct_mqttdata(field2values)
-        for name, subname_value in mqttdata.items():
-            for subname, value in subname_value.items():
-                topic = "%s/%s/%s" % (topic_prefix, name, subname)
-                self.client.publish(topic, value)
+
+        if single:
+            ## single-topic sending, i.e. everything as one single topic and JSON payload
+            self.client.publish(topic_prefix, json.dumps(mqttdata))
+        else:
+            ## multi-topic sending, i.e. each data entry as one unique topic, multiple messages
+            for name, subname_value in mqttdata.items():
+                for subname, value in subname_value.items():
+                    topic = "%s/%s/%s" % (topic_prefix, name, subname)
+                    self.client.publish(topic, value)
 
         self.disconnect()
 
@@ -415,7 +429,7 @@ def main():
             print('mqttdata:')
             pprint(mqttdata)
         else:
-            mymqtt.send_data(records)
+            mymqtt.send(records)
 
     ## main processing loop on input stream
     ## if size of rolling window is reached then call handler function mqtt_or_println
