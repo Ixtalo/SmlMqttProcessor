@@ -213,15 +213,20 @@ class TestLibsmlParsingEMH:
 
 
 class TestMqtt:
+    """
+    Test "sending" of data via MQTT.
+    """
 
-    def test_send_mqtt(self, monkeypatch):
+    def test_send(self, monkeypatch):
 
         def connect_dummy(client, host, port=1883, keepalive=60, bind_address=""):
             print("CONNECT DUMMY", host, port)
 
         def publish_dummy(client, topic, payload=None, qos=0, retain=False):
             print(topic, payload)
+            ## we expect multiple messages, multiple topics
             assert topic.startswith('tele/smartmeter')
+            ## one check for each topic...
             if topic == 'tele/smartmeter/time/first':
                 assert payload == 111
             elif topic == 'tele/smartmeter/time/last':
@@ -261,7 +266,7 @@ class TestMqtt:
         mymqtt = stmp.MyMqtt(config)
         mymqtt.connected = True
         mymqtt.client = stmp.mqtt.Client()
-        mymqtt.send_data(data)
+        mymqtt.send(data)
 
     def test_construct_data(self):
         data = {
@@ -279,3 +284,41 @@ class TestMqtt:
                     'actual': {'value': 99, 'first': -11, 'last': 99, 'median': 16.5, 'mean': 22, 'min': -22,
                                'max': 99}}
         assert actual == expected
+
+
+class TestMqttSingleTopic:
+    """
+    Test "sending" of data via MQTT as one single topic as JSON.
+    (Instead of multiple MQTT messages just send one JSON formatted message.)
+    """
+
+    def test_send(self, monkeypatch):
+
+        def connect_dummy(client, host, port=1883, keepalive=60, bind_address=""):
+            print("CONNECT DUMMY", host, port)
+
+        def publish_dummy(client, topic, payload=None, qos=0, retain=False):
+            print(topic, payload)
+            assert topic == 'tele/smartmeter'
+            ## everything as just one single topic, payload as JSON
+            assert payload == '{"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}}'
+
+        ## monkey patching
+        monkeypatch.setattr(stmp.mqtt.Client, "connect", connect_dummy)
+        monkeypatch.setattr(stmp.mqtt.Client, "publish", publish_dummy)
+
+        ## test data
+        data = {
+            'total': [1, 2, 3],
+            'actual': [-11, -22, 11, 22, 33, 99],
+            'act_sensor_time': [111, 222, 333]
+        }
+        config = ConfigParser()
+        config.add_section('Mqtt')
+        config.set('Mqtt', 'single_topic', 'true')
+
+        ## run / test
+        mymqtt = stmp.MyMqtt(config)
+        mymqtt.connected = True
+        mymqtt.client = stmp.mqtt.Client()
+        mymqtt.send(data)

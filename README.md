@@ -54,6 +54,7 @@ Hardware and runtime requirements:
 6. Create local configuration file and adjust settings:
    `cp config.template.ini config.local.ini`
    * MQTT configuration: server host, port, user/password
+     * `single_topic` boolean switch for all data in one single MQTT topic (default is `false`)
    * Serial port configuration
    * Block/Window size (for data aggregation)
 7. Run in activated virtualenv:  
@@ -139,7 +140,7 @@ act_sensor_time#6825875#
 
 
 ### Output
-The output on MQTT is like:
+The output on MQTT is like this (for multi-topic sending, config setting `single_topic=false`, which is the default):
 ```
 tele/smartmeter/time/first 11824115
 tele/smartmeter/time/last 11824175
@@ -152,6 +153,17 @@ tele/smartmeter/actual/min 235.0
 tele/smartmeter/actual/max 254.0
 ```
 
+For config setting `single_topic=true` (without line breaks; here only for readability purposes):
+```
+tele/smartmeter {
+"total": 
+   {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, 
+"actual": 
+   {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, 
+"act_sensor_time": 
+   {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}
+}
+```
 
 
 
