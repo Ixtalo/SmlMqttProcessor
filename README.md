@@ -58,7 +58,7 @@ Hardware and runtime requirements:
    * Serial port configuration
    * Block/Window size (for data aggregation)
 7. Run in activated virtualenv:  
-   `./sml_server_time/sml_server_time /dev/ttyAMA0 | python smltextmqttprocessor.py config.local.ini -` 
+   `./sml_server_time/sml_server_time /dev/ttyAMA0 | python smltextmqttprocessor.py --config config.local.ini -` 
 
 
 ### Run at Boot Time
