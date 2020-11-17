@@ -156,12 +156,11 @@ tele/smartmeter/actual/max 254.0
 For config setting `single_topic=true` (without line breaks; here only for readability purposes):
 ```
 tele/smartmeter {
-"total": 
-   {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, 
-"actual": 
-   {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, 
-"act_sensor_time": 
-   {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}
+"time": {"first": 6825875, "last": 6825877}, 
+"total": {"value": 198927.3, "first": 198927.3, "last": 198927.3, 
+   "median": 198927.3, "mean": 198927, "min": 198927.3, "max": 198927.3}, 
+"actual": {"value": 27, "first": 26, "last": 27, 
+   "median": 26, "mean": 26, "min": 26, "max": 27}
 }
 ```
 
