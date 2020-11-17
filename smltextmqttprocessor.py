@@ -10,15 +10,15 @@ Run it with:
 `./sml_server_arm /dev/ttyAMA0 | python smltextmqttprocessor.py -v config.local.ini -`
 
 Usage:
-  smltextmqttprocessor.py [options] <config-file.ini> <input>
+  smltextmqttprocessor.py [options] [--config config.ini] <input>
   smltextmqttprocessor.py -h | --help
   smltextmqttprocessor.py --version
 
 Arguments:
-  config-file.ini Configuration file [default: config.local.ini]
   input           Input file or '-' for STDIN.
 
 Options:
+  --config <file> Configuration file [default: config.local.ini]
   --no-mqtt       Do not send over MQTT (mainly for testing).
   -q --quiet      Be quiet, show only errors.
   -v --verbose    Verbose output.
@@ -53,6 +53,7 @@ import time
 import json
 from codecs import open
 from pprint import pprint
+from enum import IntEnum
 
 from docopt import docopt
 
@@ -62,9 +63,9 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.6.2"
+__version__ = "1.7.0"
 __date__ = "2020-04-21"
-__updated__ = "2020-09-27"
+__updated__ = "2020-11-17"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -115,6 +116,14 @@ __script_dir = os.path.dirname(os.path.realpath(__file__))
 if sys.version_info < (3, 0):
     sys.stderr.write("Minimum required version is Python 3.x!\n")
     sys.exit(1)
+
+
+class ExitCodes(IntEnum):
+    """
+    Exit/return codes.
+    """
+    OK = 0
+    CONFIG_FAIL = 3
 
 
 class MyMqtt:
@@ -380,8 +389,8 @@ def main():
     arguments = docopt(__doc__, version="SmlTextMqttProcessor %s (%s)" % (__version__, __updated__))
     # print(arguments)
 
-    arg_configfile = arguments['<config-file.ini>']
     arg_input = arguments['<input>']
+    arg_configfile = arguments['--config']
     arg_verbose = arguments['--verbose']
     arg_debug = arguments['--debug']
     arg_quiet = arguments['--quiet']
@@ -401,18 +410,25 @@ def main():
         logging.getLogger('').setLevel(logging.ERROR)
 
     ## Configuration
-    if not os.path.isabs(arg_configfile):
-        arg_configfile = os.path.join(__script_dir, arg_configfile)
-    arg_configfile = os.path.abspath(arg_configfile)
-    logging.info("Config file: %s", arg_configfile)
     config = configparser.ConfigParser()
-    config.read(arg_configfile)
+    if arg_configfile:
+        if not os.path.isabs(arg_configfile):
+            ## if not an absolute path then make it one based on this very script's folder
+            arg_configfile = os.path.join(__script_dir, arg_configfile)
+        arg_configfile = os.path.abspath(arg_configfile)
+        logging.info("Config file: %s", arg_configfile)
+        if not os.path.exists(arg_configfile):
+            logging.error('Given config file does not exist! Aborting.')
+            return ExitCodes.CONFIG_FAIL
+        config.read(arg_configfile)
+    ## combine all config dicts, and mask password
+    logging.info("Configuration: %s", {**config.defaults(), **dict(config.items('Mqtt')), 'password': '...'})
 
     ## MQTT
     mymqtt = MyMqtt(config)
 
     ## rolling window period
-    window_size = config.getint(configparser.DEFAULTSECT, 'block_size')
+    window_size = config.getint(configparser.DEFAULTSECT, 'block_size', fallback=30)
     logging.info('Aggregation/rolling window size: %d', window_size)
 
     ## input stream
@@ -435,7 +451,7 @@ def main():
     ## if size of rolling window is reached then call handler function mqtt_or_println
     processing_loop(istream, window_size, mqtt_or_println)
 
-    return 0
+    return ExitCodes.OK
 
 
 if __name__ == "__main__":
