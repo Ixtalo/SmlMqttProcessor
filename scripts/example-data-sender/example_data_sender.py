@@ -7,7 +7,7 @@ import os
 import sys
 from time import sleep
 
-FILENAME = '../../example_data/ISKRA_MT691_eHZ-MS2020.txt'
+FILENAME = '../../test/ISKRA_MT691_eHZ-MS2020.txt'
 
 __script_dir = os.path.dirname(os.path.realpath(__file__))
 
