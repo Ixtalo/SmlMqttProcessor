@@ -63,9 +63,9 @@ import paho.mqtt.client as mqtt
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 import sml
 
-__version__ = "1.7.0"
+__version__ = "1.7.1"
 __date__ = "2020-04-21"
-__updated__ = "2020-11-17"
+__updated__ = "2020-11-18"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
