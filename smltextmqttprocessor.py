@@ -421,8 +421,8 @@ def main():
             logging.error('Given config file does not exist! Aborting.')
             return ExitCodes.CONFIG_FAIL
         config.read(arg_configfile)
-    ## combine all config dicts, and mask password
-    logging.info("Configuration: %s", {**config.defaults(), **dict(config.items('Mqtt')), 'password': '...'})
+        ## combine all config dicts, and mask password
+        logging.info("Configuration: %s", {**config.defaults(), **dict(config.items('Mqtt')), 'password': '...'})
 
     ## MQTT
     mymqtt = MyMqtt(config)
