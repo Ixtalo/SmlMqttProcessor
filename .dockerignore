@@ -1,0 +1,15 @@
+attic
+doc
+venv
+scripts
+config.ini
+
+**/.git
+**/.gitignore
+**/.git*
+**/.github
+**/.idea
+**/.project
+**/__pycache__
+**/.pytest_cache
+**/venv
