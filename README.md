@@ -1,3 +1,5 @@
+![Python application](https://github.com/Ixtalo/SmlMqttProcessor/workflows/Python%20application/badge.svg?branch=master)
+
 # SmlMqttProcessor
 
 Process Smart Message Language ([SML](https://de.wikipedia.org/wiki/Smart_Message_Language)) from power smart meters with SML infra-red (IR) interface.
