@@ -45,23 +45,24 @@ Options:
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##
 import configparser
+import json
 import logging
 import os
 import statistics
 import sys
 import time
-import json
+# pylint: disable=redefined-builtin
 from codecs import open
-from pprint import pprint
 from enum import IntEnum
-
-from docopt import docopt
+from pprint import pprint
 
 ## https://pypi.org/project/paho-mqtt/#usage-and-api
 import paho.mqtt.client as mqtt
 ## PySML, https://pypi.org/project/pysml/
 # noinspection PyUnresolvedReferences,PyPackageRequirements
-import sml
+# pylint: disable=import-error,unused-import
+import sml  # noqa: F401
+from docopt import docopt
 
 __version__ = "1.7.1"
 __date__ = "2020-04-21"
@@ -71,7 +72,6 @@ __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
 __status__ = "Production"
 
-
 ########################################################################
 ## Configure the following to suit your actual smart meter configuration
 ##
@@ -80,23 +80,23 @@ __status__ = "Production"
 ## dictionary: MQTT-topic --> OBIS-code
 ## for OBIS codes see e.g. https://wiki.volkszaehler.org/software/obis
 SML_FIELDS = {
-    'total': '1-0:1.8.0*255',           ## Zählerstand Bezug
-    'total_tariff1': '1-0:1.8.1*255',   ## Zählerstand Bezug Tarif 1
-    'total_tariff2': '1-0:1.8.2*255',   ## Zählerstand Bezug Tarif 2
-    'total_tariff3': '1-0:1.8.3*255',   ## Zählerstand Bezug Tarif 3
-    'total_tariff4': '1-0:1.8.4*255',   ## Zählerstand Bezug Tarif 4
+    'total': '1-0:1.8.0*255',  ## Zählerstand Bezug
+    'total_tariff1': '1-0:1.8.1*255',  ## Zählerstand Bezug Tarif 1
+    'total_tariff2': '1-0:1.8.2*255',  ## Zählerstand Bezug Tarif 2
+    'total_tariff3': '1-0:1.8.3*255',  ## Zählerstand Bezug Tarif 3
+    'total_tariff4': '1-0:1.8.4*255',  ## Zählerstand Bezug Tarif 4
 
-    'total_export': '1-0:2.8.0*255',           ## Zählerstand Lieferung
-    'total_export_tariff1': '1-0:2.8.1*255',   ## Zählerstand Lieferung Tarif 1
-    'total_export_tariff2': '1-0:2.8.2*255',   ## Zählerstand Lieferung Tarif 2
-    'total_export_tariff3': '1-0:2.8.3*255',   ## Zählerstand Lieferung Tarif 3
-    'total_export_tariff4': '1-0:2.8.4*255',   ## Zählerstand Lieferung Tarif 4
+    'total_export': '1-0:2.8.0*255',  ## Zählerstand Lieferung
+    'total_export_tariff1': '1-0:2.8.1*255',  ## Zählerstand Lieferung Tarif 1
+    'total_export_tariff2': '1-0:2.8.2*255',  ## Zählerstand Lieferung Tarif 2
+    'total_export_tariff3': '1-0:2.8.3*255',  ## Zählerstand Lieferung Tarif 3
+    'total_export_tariff4': '1-0:2.8.4*255',  ## Zählerstand Lieferung Tarif 4
 
-    'actual': '1-0:16.7.0*255',         ## Leistung (Momentan)
-    'actual_l1': '1-0:36.7.0*255',      ## Leistung L1 (Momentan)
-    'actual_l2': '1-0:56.7.0*255',      ## Leistung L2 (Momentan)
-    'actual_l3': '1-0:76.7.0*255',      ## Leistung L3 (Momentan)
-    'actual_170': '1-0:1.7.0*255',      ## Wirkleistung
+    'actual': '1-0:16.7.0*255',  ## Leistung (Momentan)
+    'actual_l1': '1-0:36.7.0*255',  ## Leistung L1 (Momentan)
+    'actual_l2': '1-0:56.7.0*255',  ## Leistung L2 (Momentan)
+    'actual_l3': '1-0:76.7.0*255',  ## Leistung L3 (Momentan)
+    'actual_170': '1-0:1.7.0*255',  ## Wirkleistung
 
     'time': 'act_sensor_time'
 }
@@ -110,7 +110,7 @@ SML_HEADERS = ('1-0:96.50.1*1#', '129-129:199.130.3*255#')
 
 DEBUG = 0
 PROFILE = 0
-__script_dir = os.path.dirname(os.path.realpath(__file__))
+__SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ## check for Python3
 if sys.version_info < (3, 0):
@@ -141,13 +141,18 @@ class MyMqtt:
         self.connected = False
 
     def connect(self):
+        """
+        Connect to MQTT server and handle disconnection/reconnection events.
+        """
 
         # noinspection PyUnusedLocal,PyShadowingNames
+        # pylint: disable=invalid-name,unused-argument
         def on_connect(client, userdata, flags, rc):
             logging.info("MQTT connected: %s (%d)", mqtt.connack_string(rc), rc)
             self.connected = True
 
         # noinspection PyUnusedLocal,PyShadowingNames
+        # pylint: disable=invalid-name,unused-argument
         def on_disconnect(client, userdata, rc):
             self.connected = False
             if rc == mqtt.MQTT_ERR_SUCCESS:
@@ -194,6 +199,9 @@ class MyMqtt:
                 time.sleep(wait_effective)
 
     def disconnect(self):
+        """
+        Disconnect from MQTT server.
+        """
         self.client.disconnect()
         self.connected = False
 
@@ -324,7 +332,7 @@ def processing_loop(istream, window_size, callback, timeout=0):
     Main processing loop on input stream.
     If size of rolling window is reached then call handler function mqtt_or_println.
     A timeout can be specified to stop after n seconds of no data (e.g. for STDIN).
-    
+
     :param istream: input stream
     :param window_size: rolling window size, size of aggregation window
     :param callback: reference to messages handling callback function
@@ -346,13 +354,13 @@ def processing_loop(istream, window_size, callback, timeout=0):
             logging.debug("No data observed...waiting 1 second...")
             time.sleep(1)
 
-        if type(line) is bytes:
+        if isinstance(line, bytes):
             ## make sure line is a string, not bytes
             line = line.decode()
 
         ## check if this is a header line, i.e. beginning of new message block
         if check_stream_packet_begin(line):
-            if message:     ## initial loops have empty message...
+            if message:  ## initial loops have empty message...
                 ## record current message
                 messages.append(message)
                 logging.debug("message: %s", message)
@@ -386,6 +394,10 @@ def processing_loop(istream, window_size, callback, timeout=0):
 
 
 def main():
+    """
+    Main program entry point.
+    :return: exit/return code
+    """
     arguments = docopt(__doc__, version="SmlTextMqttProcessor %s (%s)" % (__version__, __updated__))
     # print(arguments)
 
@@ -414,7 +426,7 @@ def main():
     if arg_configfile:
         if not os.path.isabs(arg_configfile):
             ## if not an absolute path then make it one based on this very script's folder
-            arg_configfile = os.path.join(__script_dir, arg_configfile)
+            arg_configfile = os.path.join(__SCRIPT_DIR, arg_configfile)
         arg_configfile = os.path.abspath(arg_configfile)
         logging.info("Config file: %s", arg_configfile)
         if not os.path.exists(arg_configfile):
@@ -422,7 +434,9 @@ def main():
             return ExitCodes.CONFIG_FAIL
         config.read(arg_configfile)
         ## combine all config dicts, and mask password
-        logging.info("Configuration: %s", {**config.defaults(), **dict(config.items('Mqtt')), 'password': '...'})
+        logging.info("Configuration: %s", {**config.defaults(),
+                                           **dict(config.items('Mqtt')),
+                                           'password': '...'})
 
     ## MQTT
     mymqtt = MyMqtt(config)
@@ -458,6 +472,7 @@ if __name__ == "__main__":
     if DEBUG:
         sys.argv.append("--debug")
     if PROFILE:
+        # pylint: disable=invalid-name
         import cProfile
         import pstats
         profile_filename = __file__ + '.profile.bin'
