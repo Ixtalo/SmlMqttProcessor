@@ -6,6 +6,7 @@ Unit tests for smltextmqttprocessor.py, using pytest.
 
 import io
 import pytest
+import json
 import smltextmqttprocessor as stmp
 from configparser import ConfigParser
 
@@ -301,7 +302,11 @@ class TestMqttSingleTopic:
             print(topic, payload)
             assert topic == 'tele/smartmeter'
             ## everything as just one single topic, payload as JSON
-            assert payload == '{"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}}'
+            ## use json.dumps to compare the two dictionaries
+            ## (NOTE: dictionary sorting varies between Python versions and platforms!)
+            actual = json.loads(payload)
+            expected = {"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}}
+            assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
         ## monkey patching
         monkeypatch.setattr(stmp.mqtt.Client, "connect", connect_dummy)
