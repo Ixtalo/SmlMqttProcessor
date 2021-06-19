@@ -201,7 +201,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// listen on the serial device, this call is blocking.
-	sml_transport_listen(fd, &transport_receiver);
+	while (true)
+		sml_transport_listen(fd, &transport_receiver);
 	close(fd);
 
 	return 0;
