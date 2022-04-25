@@ -98,8 +98,7 @@ If you experience similar problems, you should change (or repair) your sensor.
 
 ### Input
 
-Own power smart meter model is Iskraemeco MT631.
-For details see [Wiki page of Volkszaehler.org](https://wiki.volkszaehler.org/hardware/channels/meters/power/edl-ehz/iskraemeco_mt631):
+My power smart meter model is Iskraemeco MT631. For details see [Wiki page of Volkszaehler.org](https://wiki.volkszaehler.org/hardware/channels/meters/power/edl-ehz/iskraemeco_mt631):
   * "The meter has a bidirectional IR interface in the upper right corner, which can be read by means of an IR read-write head at 9600bd, 8N1. The connection cable of the read head points down."
   * "The meter outputs the data in SML without request."
 
@@ -114,6 +113,11 @@ The [SML](https://de.wikipedia.org/wiki/Smart_Message_Language) data is like (al
 0700FF0101621B5200521A01010163BF270076050138803362006200
 726302017101635567000000
 ```
+
+The IR interface sends the SML data with a frequency of 1 signal per second.
+
+![IR blinking](./doc/energy_meter_infrared.gif)
+
 
 
 ### Processing
