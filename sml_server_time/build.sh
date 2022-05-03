@@ -1,8 +1,10 @@
 #!/bin/bash
 #set -x
 
-## https://github.com/volkszaehler/libsml/tree/6609c8117ba2c987aea386a7fffb9b4746636be6
-LIBSML_URL="https://github.com/volkszaehler/libsml/archive/6609c8117ba2c987aea386a7fffb9b4746636be6.zip"
+## https://github.com/volkszaehler/libsml/tree/d65682222dbaddccf4c2c25d4fb530572e60cbd3
+COMMIT_HASH=d65682222dbaddccf4c2c25d4fb530572e60cbd3
+
+LIBSML_URL="https://github.com/volkszaehler/libsml/archive/${COMMIT_HASH}.zip"
 
 CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 TEMPFILE="/tmp/libsml.zip"
@@ -14,7 +16,7 @@ fi
 
 if [ ! -d $TARGETDIR ]; then
   unzip -n -q -x -d "$CURDIR" $TEMPFILE
-  mv "$CURDIR/libsml-6609c8117ba2c987aea386a7fffb9b4746636be6" "$TARGETDIR"
+  mv "$CURDIR/libsml-${COMMIT_HASH}" "$TARGETDIR"
 fi
 
 pushd "$TARGETDIR"
