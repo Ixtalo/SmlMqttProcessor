@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-29"
 __author__ = "Ixtalo"
@@ -151,7 +151,7 @@ class MyMqtt:
         # noinspection PyUnusedLocal,PyShadowingNames
         # pylint: disable=invalid-name,unused-argument
         def on_connect(client, userdata, flags, rc):
-            logging.info("MQTT connected: %s (%d)", mqtt.connack_string(rc), rc)
+            logging.info("MQTT connect: %s (%d)", mqtt.connack_string(rc), rc)
             self.connected = True
 
         # noinspection PyUnusedLocal,PyShadowingNames
@@ -159,7 +159,7 @@ class MyMqtt:
         def on_disconnect(client, userdata, rc):
             self.connected = False
             if rc == mqtt.MQTT_ERR_SUCCESS:
-                logging.debug('MQTT: disconnect successful.')
+                logging.info('MQTT disconnect: successful.')
             else:
                 logging.warning("MQTT unexpected disconnection! %s (%d)", mqtt.error_string(rc), rc)
 
@@ -269,8 +269,6 @@ class MyMqtt:
                     topic = "%s/%s/%s" % (topic_prefix, name, subname)
                     self.client.publish(topic, value)
 
-        self.disconnect()
-
 
 def convert_messages2records(messages):
     """
@@ -374,7 +372,7 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None):
 
             # check if we filled the window
             if len(messages) >= window_size:
-                logging.debug("window filled (#%d), handling...", window_size)
+                logging.info("window (%d) filled, handling #%d messages...", window_size, len(messages))
                 # handle all messages
                 callback(messages)
                 # start a new collection
@@ -391,7 +389,7 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None):
                     logging.debug("delta: %.2f, prev: %.2f, curr: %.2f, field: %s",
                                   delta, prev, curr, field_name)
                     if delta >= delta_val:
-                        logging.info("field '%s' %.2f >= %.2f, above delta threshold, handling...",
+                        logging.info("field '%s', delta: %.2f, above delta threshold (%.2f), handling...",
                                      field_name, delta, delta_val)
                         # handle all messages
                         callback(messages)
