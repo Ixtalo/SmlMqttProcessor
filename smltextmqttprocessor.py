@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.9.0"
+__version__ = "1.9.1"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-29"
 __author__ = "Ixtalo"
@@ -466,14 +466,12 @@ def main():
             arg_configfile = os.path.join(__SCRIPT_DIR, arg_configfile)
         arg_configfile = os.path.abspath(arg_configfile)
         logging.info("Config file: %s", arg_configfile)
-        if not os.path.exists(arg_configfile):
-            logging.error('Given config file does not exist! Aborting.')
+        if not (os.path.isfile(arg_configfile) and os.access(arg_configfile, os.R_OK)):
+            logging.error('Config file is not a file or not accessible! Aborting.')
             return ExitCodes.CONFIG_FAIL
-        config.read(arg_configfile)
+        config.read_file(arg_configfile)
         # combine all config dicts, and mask password
-        logging.info("Configuration: %s", {**config.defaults(),
-                                           **dict(config.items('Mqtt')),
-                                           'password': '...'})
+        logging.info("Configuration: %s", {**config.defaults(), **dict(config.items())})
 
     # set the threshold deltas from config
     deltas_abs = {}
