@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.8.3"
+__version__ = "1.8.4"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-29"
 __author__ = "Ixtalo"
@@ -425,9 +425,10 @@ def main():
     arg_quiet = arguments['--quiet']
     arg_no_mqtt = arguments['--no-mqtt']
 
-    # setup logging
+    ## setup logging
     logging.basicConfig(level=logging.WARNING,
-                        format='%(asctime)s %(levelname)-8s %(name)-10s %(message)s',
+                        stream=sys.stderr,
+                        format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
     if DEBUG or arg_debug:
         logging.getLogger('').setLevel(logging.DEBUG)
