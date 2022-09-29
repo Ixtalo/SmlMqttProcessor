@@ -1,0 +1,17 @@
+FROM python:3.5
+
+ENV PIPENV_VENV_IN_PROJECT=1
+
+RUN apt-get update \
+    && apt-get install -y python-setuptools \
+    && apt-get clean \
+    && python -m pip install --upgrade pip \
+    && python -m pip install pipenv
+
+COPY . /app/
+WORKDIR /app
+
+RUN pipenv --python /usr/local/bin/python install --dev
+
+CMD pipenv run pytest
+

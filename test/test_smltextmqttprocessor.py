@@ -5,10 +5,17 @@ Unit tests for smltextmqttprocessor.py, using pytest.
 """
 
 import io
-import pytest
 import json
-import smltextmqttprocessor as stmp
 from configparser import ConfigParser
+import pytest
+import smltextmqttprocessor as stmp
+
+
+# f-string does not work with Python 3.5
+# pylint: disable=consider-using-f-string
+
+# no docstring for tests
+# pylint: disable=missing-function-docstring
 
 
 def test_convert_messages2records():
@@ -19,10 +26,11 @@ def test_convert_messages2records():
 
 
 class TestLibsmlParsing:
+    """Tests for libSML-parsing."""
 
     def test_parse_line(self):
-        assert type(stmp.parse_line("act_sensor_time#1234#")[1]) is int
-        assert type(stmp.parse_line("1-0:1.8.0*255#123.4#Wh")[1]) is float
+        assert isinstance(stmp.parse_line("act_sensor_time#1234#")[1], int)
+        assert isinstance(stmp.parse_line("1-0:1.8.0*255#123.4#Wh")[1], float)
 
         assert stmp.parse_line("1-0:1.8.0*255#123.4#Wh") == ('total', 123.4)
         assert stmp.parse_line("1-0:1.8.1*255#123.4#Wh") == ('total_tariff1', 123.4)
@@ -69,12 +77,15 @@ class TestLibsmlParsing:
 
 
 class TestLibsmlParsingISKRA:
+    """Tests for ISKRA smart meter SML."""
 
-    ## By declaring fixture with autouse=True, it will be automatically
-    ## invoked for each test function defined in the same module.
+    TIMEOUT = 5
+
+    # By declaring fixture with autouse=True, it will be automatically
+    # invoked for each test function defined in the same module.
     @pytest.fixture(autouse=True)
     def run_around_tests(self):
-        ## before
+        # before
         self.istream = io.StringIO()
         self.istream.write("""1-0:96.50.1*1#ISK#
             1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
@@ -87,34 +98,107 @@ class TestLibsmlParsingISKRA:
             1-0:1.8.0*255#100.1#Wh
             1-0:16.7.0*255#22.2#W
             act_sensor_time#2#
+
+            1-0:96.50.1*1#ISK#
+            1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
+            1-0:1.8.0*255#110.1#Wh
+            1-0:16.7.0*255#122.2#W
+            act_sensor_time#3#
+
+            1-0:96.50.1*1#ISK#
+            1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
+            1-0:1.8.0*255#120.1#Wh
+            1-0:16.7.0*255#32.2#W
+            act_sensor_time#4#
             """)
         self.istream.seek(0)
 
-        ## A test function will be run at this point
+        # A test function will be run at this point
         yield
 
-        ## after
+        # after
         # ...
 
-    def test_processing_loop_window2(self):
-        def messages_handler(messages):
-            print(messages)
-            assert len(messages) == 2
-            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1}, {'actual': 22.2, 'time': 2, 'total': 100.1}]
-
-        stmp.processing_loop(self.istream, 2, messages_handler, timeout=2)
-
     def test_processing_loop_window1(self):
+        """Test main loop with a window size."""
         def messages_handler(messages):
-            print(messages)
-            assert len(messages) == 1
-            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1}] or \
-                   messages == [{'actual': 22.2, 'time': 2, 'total': 100.1}]
+            # this handler will be called n times for n messages in self.istream
+            # because of window_size=1
+            assert messages in ([{'actual': 1.1, 'time': 1, 'total': 10.1}],
+                                [{'actual': 22.2, 'time': 2, 'total': 100.1}],
+                                [{'actual': 122.2, 'time': 3, 'total': 110.1}],
+                                [{'actual': 32.2, 'time': 4, 'total': 120.1}])
 
-        stmp.processing_loop(self.istream, 1, messages_handler, timeout=2)
+        stmp.processing_loop(self.istream, 1, messages_handler, timeout=self.TIMEOUT)
+
+    def test_processing_loop_window2(self):
+        """Test main loop with a window size."""
+        def messages_handler(messages):
+            # this handler will be called n/2 times for n messages in self.istream
+            # because of window_size=2
+            # pylint: disable=consider-using-in
+            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
+                                {'actual': 22.2, 'time': 2, 'total': 100.1}] or \
+                   messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
+                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+
+        stmp.processing_loop(self.istream, 2, messages_handler, timeout=self.TIMEOUT)
+
+    def test_processing_loop_window99(self):
+        """Test main loop with a window size."""
+        def messages_handler(messages):
+            # all messages are being accumulated because of big window size
+            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
+                                {'actual': 22.2, 'time': 2, 'total': 100.1},
+                                {'actual': 122.2, 'time': 3, 'total': 110.1},
+                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+
+        stmp.processing_loop(self.istream, 99, messages_handler, timeout=self.TIMEOUT)
+
+    def test_processing_loop_window2_delta50(self):
+        """Test main loop with a window size and threshold-delta."""
+        def messages_handler(messages):
+            # 3 messages because of delta-threshold 122 >= 50
+            # => immediate threshold-based reaction
+            # pylint: disable=consider-using-in
+            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
+                                {'actual': 22.2, 'time': 2, 'total': 100.1},
+                                {'actual': 122.2, 'time': 3, 'total': 110.1}] or \
+                   messages == [{'actual': 32.2, 'time': 4, 'total': 120.1}]    # the rest...
+
+        deltas = {"actual": 50}
+        stmp.processing_loop(self.istream, 99, messages_handler,
+                             timeout=self.TIMEOUT, deltas_abs=deltas)
+
+    def test_processing_loop_window2_delta150(self):
+        """Test main loop with a window size and threshold-delta."""
+        def messages_handler(messages):
+            # all 4 messages because of delta-threshold 112 !>= 150
+            # => no immediate (threshold-based) reaction
+            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
+                                {'actual': 22.2, 'time': 2, 'total': 100.1},
+                                {'actual': 122.2, 'time': 3, 'total': 110.1},
+                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+
+        deltas = {"actual": 150}
+        stmp.processing_loop(self.istream, 99, messages_handler,
+                             timeout=self.TIMEOUT, deltas_abs=deltas)
+
+    def test_processing_invalid_delta_field_name(self):
+        """Test main loop with a window size and threshold-delta."""
+        def messages_handler(messages):
+            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
+                                {'actual': 22.2, 'time': 2, 'total': 100.1},
+                                {'actual': 122.2, 'time': 3, 'total': 110.1},
+                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+
+        deltas = {"ISINVALID": 1}
+        stmp.processing_loop(self.istream, 99, messages_handler,
+                             timeout=self.TIMEOUT, deltas_abs=deltas)
 
     def test_processing_loop_invalid(self):
-        ## before
+        """Test main loop with invalid data."""
+        # before
         istream = io.StringIO()
         istream.write("""1-0:96.50.1*1#ISK#
             1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
@@ -125,7 +209,6 @@ class TestLibsmlParsingISKRA:
         istream.seek(0)
 
         def messages_handler(messages):
-            print(messages)
             assert len(messages) == 1
             assert messages == [{'actual': 1.1, 'time': 1}]
 
@@ -133,12 +216,13 @@ class TestLibsmlParsingISKRA:
 
 
 class TestLibsmlParsingEMH:
+    """Tests for EMH smart meter SML."""
 
-    ## By declaring fixture with autouse=True, it will be automatically
-    ## invoked for each test function defined in the same module.
+    # By declaring fixture with autouse=True, it will be automatically
+    # invoked for each test function defined in the same module.
     @pytest.fixture(autouse=True)
     def run_around_tests(self):
-        ## before
+        # before
         self.istream = io.StringIO()
         self.istream.write("""129-129:199.130.3*255#EMH#
             1-0:0.0.9*255#01 a8 15 98 64 80 02 01 02 #
@@ -159,15 +243,14 @@ class TestLibsmlParsingEMH:
             """)
         self.istream.seek(0)
 
-        ## A test function will be run at this point
+        # A test function will be run at this point
         yield
 
-        ## after
+        # after
         # ...
 
     def test_processing_loop_window2(self):
         def messages_handler(messages):
-            print(messages)
             assert len(messages) == 2
             assert messages == [{'time': 118137421,
                                  'total': 5378499.0,
@@ -182,21 +265,18 @@ class TestLibsmlParsingEMH:
 
     def test_processing_loop_window1(self):
         def messages_handler(messages):
-            print(messages)
-            assert len(messages) == 1
+            # pylint: disable=consider-using-in
             assert messages == [{'time': 118137421,
                                  'total': 5378499.0,
                                  'total_tariff1': 5378499.0,
-                                 'total_tariff2': 0.0}] \
-                   or messages == [{'time': 118137423,
-                                    'total': 5378499.1,
-                                    'total_tariff1': 5378499.1,
-                                    'total_tariff2': 0.0}]
+                                 'total_tariff2': 0.0}] or \
+                   messages == [{'time': 118137423, 'total': 5378499.1,
+                                 'total_tariff1': 5378499.1, 'total_tariff2': 0.0}]
 
         stmp.processing_loop(self.istream, 1, messages_handler, timeout=2)
 
     def test_processing_loop_invalid(self):
-        ## before
+        # before
         istream = io.StringIO()
         istream.write("""129-129:199.130.3*255#EMH#
             1-0:1.8.0*255#5378499.0Wh
@@ -206,7 +286,6 @@ class TestLibsmlParsingEMH:
         istream.seek(0)
 
         def messages_handler(messages):
-            print(messages)
             assert len(messages) == 1
             assert messages == [{'actual': 1.1, 'time': 1}]
 
@@ -214,9 +293,7 @@ class TestLibsmlParsingEMH:
 
 
 class TestMqtt:
-    """
-    Test "sending" of data via MQTT.
-    """
+    """Tests for "sending" of data via (virtual/mocked) MQTT."""
 
     def test_send(self, monkeypatch):
 
@@ -225,9 +302,9 @@ class TestMqtt:
 
         def publish_dummy(client, topic, payload=None, qos=0, retain=False):
             print(topic, payload)
-            ## we expect multiple messages, multiple topics
+            # we expect multiple messages, multiple topics
             assert topic.startswith('tele/smartmeter')
-            ## one check for each topic...
+            # one check for each topic...
             if topic == 'tele/smartmeter/time/first':
                 assert payload == 111
             elif topic == 'tele/smartmeter/time/last':
@@ -251,11 +328,11 @@ class TestMqtt:
             elif topic == 'tele/smartmeter/actual/max':
                 assert payload == 99
 
-        ## monkey patching
+        # monkey patching
         monkeypatch.setattr(stmp.mqtt.Client, "connect", connect_dummy)
         monkeypatch.setattr(stmp.mqtt.Client, "publish", publish_dummy)
 
-        ## test data
+        # test data
         data = {
             'total': [1, 2, 3],
             'actual': [-11, -22, 11, 22, 33, 99],
@@ -263,7 +340,7 @@ class TestMqtt:
         }
         config = ConfigParser()
 
-        ## run / test
+        # run / test
         mymqtt = stmp.MyMqtt(config)
         mymqtt.connected = True
         mymqtt.client = stmp.mqtt.Client()
@@ -277,7 +354,7 @@ class TestMqtt:
         }
         config = ConfigParser()
 
-        ## run / test
+        # run / test
         mymqtt = stmp.MyMqtt(config)
         actual = mymqtt.construct_mqttdata(data)
         expected = {'time': {'first': 111, 'last': 333},
@@ -288,8 +365,7 @@ class TestMqtt:
 
 
 class TestMqttSingleTopic:
-    """
-    Test "sending" of data via MQTT as one single topic as JSON.
+    """Tests for "sending" of data via (mocked) MQTT as one single topic as JSON.
     (Instead of multiple MQTT messages just send one JSON formatted message.)
     """
 
@@ -301,18 +377,18 @@ class TestMqttSingleTopic:
         def publish_dummy(client, topic, payload=None, qos=0, retain=False):
             print(topic, payload)
             assert topic == 'tele/smartmeter'
-            ## everything as just one single topic, payload as JSON
-            ## use json.dumps to compare the two dictionaries
-            ## (NOTE: dictionary sorting varies between Python versions and platforms!)
+            # everything as just one single topic, payload as JSON
+            # use json.dumps to compare the two dictionaries
+            # (NOTE: dictionary sorting varies between Python versions and platforms!)
             actual = json.loads(payload)
             expected = {"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}}
             assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
-        ## monkey patching
+        # monkey patching
         monkeypatch.setattr(stmp.mqtt.Client, "connect", connect_dummy)
         monkeypatch.setattr(stmp.mqtt.Client, "publish", publish_dummy)
 
-        ## test data
+        # test data
         data = {
             'total': [1, 2, 3],
             'actual': [-11, -22, 11, 22, 33, 99],
@@ -322,7 +398,7 @@ class TestMqttSingleTopic:
         config.add_section('Mqtt')
         config.set('Mqtt', 'single_topic', 'true')
 
-        ## run / test
+        # run / test
         mymqtt = stmp.MyMqtt(config)
         mymqtt.connected = True
         mymqtt.client = stmp.mqtt.Client()

@@ -13,34 +13,39 @@ from subprocess import Popen, PIPE
 import pytest
 import smltextmqttprocessor as stmp
 
+# f-string does not work with Python 3.5
+# pylint: disable=consider-using-f-string
+
+# no docstring for tests
+# pylint: disable=missing-function-docstring
+
 __script_dir = os.path.dirname(os.path.realpath(__file__))
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(levelname)-8s %(name)-10s %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
-n = 0
+N = 0
 
 
 def __processfile(filepath, window_size):
-    global n
+    global N
+
+    ## reset counter
+    N = 0
+
+    ## aggregation callback
+    def data_handler(_):
+        ## just count how often this has been called
+        global N
+        N += 1
 
     ## call external binary and capture STDOUT
     cmd = "%s %s" % (os.path.join(__script_dir, '../sml_server_time/sml_server_time'), filepath)
-    proc = Popen(shlex.split(cmd), stdout=PIPE)
+    with Popen(shlex.split(cmd), stdout=PIPE) as proc:
+        stmp.processing_loop(proc.stdout, window_size, data_handler, timeout=1)
 
-    ## reset counter
-    n = 0
-
-    ## aggregation callback
-    def data_handler(data):
-        ## just count how often this has been called
-        global n
-        n += 1
-
-    stmp.processing_loop(proc.stdout, window_size, data_handler, timeout=1)
-
-    return n
+    return N
 
 
 def test_processing_loop_exampledatafiles_window1():
