@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.8.2"
+__version__ = "1.8.3"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-29"
 __author__ = "Ixtalo"
@@ -383,10 +383,10 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None):
                     prev = messages[-2][field_name]
                     curr = messages[-1][field_name]
                     delta = abs(prev - curr)
-                    logging.debug("delta: %.2f, prev: %.2f, curr: %.2f, field: %s",
+                    logging.debug("delta: %.1f, prev: %.1f, curr: %.1f, field: %s",
                                   delta, prev, curr, field_name)
                     if delta >= delta_val:
-                        logging.info("field '%s', delta: %.2f, above delta threshold (%.2f), handling...",
+                        logging.info("field '%s', delta: %d, above delta threshold (%d), handling...",
                                      field_name, delta, delta_val)
                         callback(messages)  # handle all messages
                         messages = []       # start a new collection
