@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.8.1"
+__version__ = "1.8.2"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-29"
 __author__ = "Ixtalo"
@@ -370,13 +370,10 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None):
             # new header line, new message
             message = {}
 
-            # check if we filled the window
             if len(messages) >= window_size:
                 logging.info("window (%d) filled, handling #%d messages...", window_size, len(messages))
-                # handle all messages
-                callback(messages)
-                # start a new collection
-                messages = []
+                callback(messages)  # handle all messages
+                messages = []       # start a new collection
             elif deltas_abs and len(messages) >= 2:
                 # dynamic checking of all fields in message according to declared delta-thresholds
                 for field_name, delta_val in deltas_abs.items():
@@ -391,10 +388,10 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None):
                     if delta >= delta_val:
                         logging.info("field '%s', delta: %.2f, above delta threshold (%.2f), handling...",
                                      field_name, delta, delta_val)
-                        # handle all messages
-                        callback(messages)
-                        # start a new collection
-                        messages = []
+                        callback(messages)  # handle all messages
+                        messages = []       # start a new collection
+                        # stop delta stuff, i.e., only 1 handling when delta event occurs
+                        break
 
             # current header-line is done, proceed to next line
             continue
