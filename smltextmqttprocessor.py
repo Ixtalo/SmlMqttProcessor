@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.10.1"
+__version__ = "1.10.2"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-30"
 __author__ = "Ixtalo"
@@ -450,7 +450,7 @@ def main():
         if not (os.path.isfile(arg_configfile) and os.access(arg_configfile, os.R_OK)):
             logging.error('Config file is not a file or not accessible! Aborting.')
             return ExitCodes.CONFIG_FAIL
-        config.read_file(arg_configfile)
+        config.read(arg_configfile)
         # combine all config dicts, and mask password
         logging.info("Configuration: %s", {**config.defaults(), **dict(config.items())})
 
