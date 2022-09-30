@@ -14,4 +14,3 @@ WORKDIR /app
 RUN pipenv --python /usr/local/bin/python install --dev
 
 CMD pipenv run pytest
-

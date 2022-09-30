@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.10.0"
+__version__ = "1.10.1"
 __date__ = "2020-04-21"
 __updated__ = "2022-09-30"
 __author__ = "Ixtalo"
@@ -122,21 +122,18 @@ if sys.version_info < (3, 5):
 
 
 class ExitCodes(IntEnum):
-    """
-    Exit/return codes.
-    """
+    """Exit/return codes."""
+
     OK = 0
     CONFIG_FAIL = 3
 
 
 class MyMqtt:
-    """
-    MQTT publishing.
-    """
+    """MQTT publishing."""
 
     def __init__(self, config):
-        """
-        MQTT publishing
+        """MQTT publishing.
+
         :param config: ConfigParser object, e.g. from config.ini
         """
         self.client = None
@@ -144,10 +141,7 @@ class MyMqtt:
         self.connected = False
 
     def connect(self):
-        """
-        Connect to MQTT server and handle disconnection/reconnection events.
-        """
-
+        """Connect to MQTT server and handle disconnection/reconnection events."""
         # noinspection PyUnusedLocal,PyShadowingNames
         # pylint: disable=invalid-name,unused-argument
         def on_connect(client, userdata, flags, rc):
@@ -202,17 +196,13 @@ class MyMqtt:
                 time.sleep(wait_effective)
 
     def disconnect(self):
-        """
-        Disconnect from MQTT server.
-        """
+        """Disconnect from MQTT server."""
         self.client.disconnect()
         self.connected = False
 
     @staticmethod
     def construct_mqttdata(field2values):
-        """
-        Construct a 2-dimensinal dictionary:
-           fieldname --> value-type --> value
+        """Construct a 2-dimensional dictionary fieldname-->value-type-->value.
 
         Example:
            total --> mean --> value
@@ -245,8 +235,8 @@ class MyMqtt:
         return result
 
     def send(self, field2values):
-        """
-        Sends (publish) data to MQTT.
+        """Publish (send) data to MQTT.
+
         :param field2values: collected data, dictionary: fieldname --> [data points]
         :return: Nothing
         """
@@ -271,8 +261,8 @@ class MyMqtt:
 
 
 def convert_messages2records(messages):
-    """
-    Convert a list of message-dictionaries to a dictionary with value-lists.
+    """Convert a list of message-dictionaries to a dictionary with value-lists.
+
     This is:
         [ {a:11, b:12}, {a:21, b:22}, ... ]  --> {a:[11,21], b:[12,22]}
 
@@ -290,9 +280,8 @@ def convert_messages2records(messages):
 
 
 def check_stream_packet_begin(line):
-    """
-    Check if the given string line contains a SML header indicating
-    a new message block.
+    """Check if the given string line contains a SML header indicating a new message block.
+
     :param line: line (string)
     :return: True if begin of new message
     """
@@ -304,8 +293,8 @@ def check_stream_packet_begin(line):
 
 
 def parse_line(line):
-    """
-    Parse a single SML line.
+    """Parse a single SML line.
+
     :param line: SML message line
     :return: (fieldname, value) tuple according to SML_FIELDS
     """
@@ -329,8 +318,8 @@ def parse_line(line):
 
 
 def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
-    """
-    Main processing loop on input stream.
+    """Run the main processing loop on input stream.
+
     If size of rolling window is reached then call handler function mqtt_or_println.
     A timeout can be specified to stop after n seconds of no data (e.g. for STDIN).
 
@@ -370,12 +359,12 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
             # new header line, new message
             message = {}
 
-            mn = len(messages)
-            if mn >= window_size:
-                logging.info("window (%d) filled, handling #%d messages...", window_size, mn)
+            n_msgs = len(messages)
+            if n_msgs >= window_size:
+                logging.info("window (%d) filled, handling #%d messages...", window_size, n_msgs)
                 callback(messages)  # handle all messages
                 messages = []       # start a new collection
-            elif deltas and mn >= 2:
+            elif deltas and n_msgs >= 2:
                 # dynamic checking of all fields in message according to declared delta-thresholds
                 for field_name, delta_value in deltas.items():
                     if field_name not in messages[-2] or field_name not in messages[-1]:
@@ -391,7 +380,8 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
 
                     # determine if there's a change
                     # if 0 <= delta_value <= 1 then use relative (percentage), else absolute
-                    is_change = delta >= delta_value * curr if delta_value < 1 else delta >= delta_value
+                    is_change = delta >= delta_value * curr if delta_value < 1 \
+                        else delta >= delta_value
 
                     if is_change:
                         logging.info("field '%s', delta: %d, above threshold (%d), handling...",
@@ -420,8 +410,8 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
 
 
 def main():
-    """
-    Main program entry point.
+    """Run the main program entry point.
+
     :return: exit/return code
     """
     version_string = "SmlTextMqttProcessor %s (%s)" % (__version__, __updated__)
@@ -433,7 +423,7 @@ def main():
     arg_quiet = arguments['--quiet']
     arg_no_mqtt = arguments['--no-mqtt']
 
-    ## setup logging
+    # setup logging
     logging.basicConfig(level=logging.WARNING,
                         format='%(asctime)s %(levelname)-8s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')

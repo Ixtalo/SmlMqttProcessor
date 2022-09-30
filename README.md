@@ -7,14 +7,14 @@ Process Smart Message Language ([SML](https://de.wikipedia.org/wiki/Smart_Messag
 It depends heavily on the great [libsml](https://github.com/volkszaehler/libsml) library (GPL3 license), forked from [volkszaehler/libsml](https://github.com/volkszaehler/libsml).
 
 Concept:
-- This implementation uses a Rasperry Pi Zero with an atatched serial optical [TTL reader](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang) to capture SML data sent by a power smart meter. 
+- This implementation uses a Rasperry Pi Zero with an atatched serial optical [TTL reader](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang) to capture SML data sent by a power smart meter.
 - The SML processing is done by [libsml](https://github.com/volkszaehler/libsml).
 - libsml's textual output is parsed, aggregated for a 1 minute time window and forwared as MQTT statements.
 - The MQTT messages are used in e.g., [Pimatic.org](https://pimatic.org) smart home app to display the power consumption history, or using [Grafana](https://grafana.com).
 
-![Pimatic](./doc/pimatic_powermeter.png)  
+![Pimatic](./doc/pimatic_powermeter.png)
 
-![Grafana](./doc/grafana24h.png)  
+![Grafana](./doc/grafana24h.png)
 
 
 
@@ -47,11 +47,11 @@ Hardware and runtime requirements:
 1. `git clone --recurse-submodules` this repository
    * ATTENTION: `--recurse-submodules` is needed!
 2. Build `sml_server_time`, see [sml_server_time/README.md](sml_server_time/README.md).
-3. Generate Python virtual environment allowing access to the system's Python packages:  
+3. Generate Python virtual environment allowing access to the system's Python packages:
    `python -m virtualenv --python=python3.5 --system-site-packages venv`
-4. Activate virtualenv:  
+4. Activate virtualenv:
    `source ./venv/bin/activate`
-5. Run in activated virtualenv and study CLI help:  
+5. Run in activated virtualenv and study CLI help:
    `python smltextmqttprocessor.py --help`
 6. Create local configuration file and adjust settings:
    `cp config.template.ini config.local.ini`
@@ -59,8 +59,8 @@ Hardware and runtime requirements:
      * `single_topic` boolean switch for all data in one single MQTT topic (default is `false`)
    * Serial port configuration
    * Block/Window size (for data aggregation)
-7. Run in activated virtualenv:  
-   `./sml_server_time/sml_server_time /dev/ttyAMA0 | python smltextmqttprocessor.py --config config.local.ini -` 
+7. Run in activated virtualenv:
+   `./sml_server_time/sml_server_time /dev/ttyAMA0 | python smltextmqttprocessor.py --config config.local.ini -`
 
 
 ### Run at Boot Time
@@ -83,14 +83,14 @@ The processing pipeline is:
 
 I use the TTL IR read-write reader as specified on [volkszaehler.org](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang).
 
-![IR Reader](doc/ir-reader_1.jpg)  
-![IR Reader](doc/ir-reader_2.jpg)  
+![IR Reader](doc/ir-reader_1.jpg)
+![IR Reader](doc/ir-reader_2.jpg)
 
 
 #### SML Reading Problems
 
 If anybody else has problems reading valid SML:
-I had some real problems working with my power meter and the IR TTL sensor reader. The normal, intended placement using the magnet and directly placing it on the IR window did not yield any valid SML data, but only garbage. However, a periodicity could be observed. After tedious experiments I found out that I need a very specific spacial and rotary alignment of the sensor, see the images above. I had to put a specific distance between the sensor and the meter's IR window; I used magnets for that. With this I get valid SML packages. But even little translatory or rotary deviation leeds to invalid SML messages. 
+I had some real problems working with my power meter and the IR TTL sensor reader. The normal, intended placement using the magnet and directly placing it on the IR window did not yield any valid SML data, but only garbage. However, a periodicity could be observed. After tedious experiments I found out that I need a very specific spacial and rotary alignment of the sensor, see the images above. I had to put a specific distance between the sensor and the meter's IR window; I used magnets for that. With this I get valid SML packages. But even little translatory or rotary deviation leeds to invalid SML messages.
 Further experiments showed that the IR TTL sensor was faulty.
 If you experience similar problems, you should change (or repair) your sensor.
 
@@ -168,10 +168,10 @@ tele/smartmeter/actual/max 254.0
 For config setting `single_topic=true` (without line breaks; here only for readability purposes):
 ```
 tele/smartmeter {
-"time": {"first": 6825875, "last": 6825877}, 
-"total": {"value": 198927.3, "first": 198927.3, "last": 198927.3, 
-   "median": 198927.3, "mean": 198927, "min": 198927.3, "max": 198927.3}, 
-"actual": {"value": 27, "first": 26, "last": 27, 
+"time": {"first": 6825875, "last": 6825877},
+"total": {"value": 198927.3, "first": 198927.3, "last": 198927.3,
+   "median": 198927.3, "mean": 198927, "min": 198927.3, "max": 198927.3},
+"actual": {"value": 27, "first": 26, "last": 27,
    "median": 26, "mean": 26, "min": 26, "max": 27}
 }
 ```

@@ -1,8 +1,6 @@
 #!pytest
 # -*- coding: utf-8 -*-
-"""
-Unit tests for smltextmqttprocessor.py, using pytest.
-"""
+"""Unit tests for smltextmqttprocessor.py, using pytest."""
 
 import io
 import json
@@ -14,11 +12,13 @@ import smltextmqttprocessor as stmp
 # f-string does not work with Python 3.5
 # pylint: disable=consider-using-f-string
 
-# no docstring for tests
-# pylint: disable=missing-function-docstring
+# do not complain about missing docstring for tests
+# pylint: disable=missing-function-docstring, line-too-long
+# noqa: D102
 
 
 def test_convert_messages2records():
+    """Test for converting message-dictionaries to a dictionary with value-lists"""
     messages = [{'a': 11, 'b': 12}, {'a': 21, 'b': 22}]
     expected = {'a': [11, 21], 'b': [12, 22]}
     actual = stmp.convert_messages2records(messages)
@@ -86,13 +86,14 @@ class TestLibsmlParsingISKRA:
     @pytest.fixture(autouse=True)
     def run_around_tests(self):
         # before
+        # pylint: disable=attribute-defined-outside-init
         self.istream = io.StringIO()
         self.istream.write("""1-0:96.50.1*1#ISK#
             1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
             1-0:1.8.0*255#10.1#Wh
             1-0:16.7.0*255#1.1#W
             act_sensor_time#1#
-        
+
             1-0:96.50.1*1#ISK#
             1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
             1-0:1.8.0*255#100.1#Wh
@@ -110,7 +111,7 @@ class TestLibsmlParsingISKRA:
             1-0:1.8.0*255#120.1#Wh
             1-0:16.7.0*255#32.2#W
             act_sensor_time#4#
-            
+
             1-0:96.50.1*1#ISK#
             1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
             1-0:1.8.0*255#125.1#Wh
@@ -127,6 +128,7 @@ class TestLibsmlParsingISKRA:
 
     def test_processing_loop_window1(self):
         """Test main loop with a window size."""
+
         def messages_handler(messages):
             # this handler will be called n times for n messages in self.istream
             # because of window_size=1
@@ -140,20 +142,22 @@ class TestLibsmlParsingISKRA:
 
     def test_processing_loop_window2(self):
         """Test main loop with a window size."""
+
         def messages_handler(messages):
             # this handler will be called 4/2+1=5 times for 5 messages in self.istream
             # because of window_size=2
             # pylint: disable=consider-using-in
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1}] or \
-                   messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
-                                {'actual': 32.2, 'time': 4, 'total': 120.1}] or \
-                   messages == [{'actual': 30.6, 'time': 5, 'total': 125.1}]
+                messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
+                             {'actual': 32.2, 'time': 4, 'total': 120.1}] or \
+                messages == [{'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         stmp.processing_loop(self.istream, 2, messages_handler, timeout=self.TIMEOUT)
 
     def test_processing_loop_window99(self):
         """Test main loop with a window size."""
+
         def messages_handler(messages):
             # all messages are being accumulated because of big window size
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
@@ -166,6 +170,7 @@ class TestLibsmlParsingISKRA:
 
     def test_processing_loop_window2_delta50(self):
         """Test main loop with a window size and threshold-delta."""
+
         def messages_handler(messages):
             # 3 messages because of delta-threshold 122 >= 50, then the rest
             # => immediate threshold-based reaction
@@ -173,8 +178,8 @@ class TestLibsmlParsingISKRA:
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1},
                                 {'actual': 122.2, 'time': 3, 'total': 110.1}] or \
-                   messages == [{'actual': 32.2, 'time': 4, 'total': 120.1},
-                                {'actual': 30.6, 'time': 5, 'total': 125.1}]
+                messages == [{'actual': 32.2, 'time': 4, 'total': 120.1},
+                             {'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         deltas = {"actual": 50}
         stmp.processing_loop(self.istream, 99, messages_handler,
@@ -182,6 +187,7 @@ class TestLibsmlParsingISKRA:
 
     def test_processing_loop_window2_delta200(self):
         """Test main loop with a window size and threshold-delta."""
+
         def messages_handler(messages):
             # all messages because of high delta-threshold
             # => no immediate (threshold-based) reaction
@@ -197,14 +203,15 @@ class TestLibsmlParsingISKRA:
 
     def test_processing_loop_window2_delta10percent(self):
         """Test main loop with a window size and threshold-delta."""
+
         def messages_handler(messages):
             # this handler will be called 3 times because of 10 % delta and 2 changes
             # pylint: disable=consider-using-in
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1}] or \
-                   messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
-                                {'actual': 32.2, 'time': 4, 'total': 120.1}] or \
-                   messages == [{'actual': 30.6, 'time': 5, 'total': 125.1}]
+                messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
+                             {'actual': 32.2, 'time': 4, 'total': 120.1}] or \
+                messages == [{'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         deltas = {"actual": 0.1}
         stmp.processing_loop(self.istream, 99, messages_handler,
@@ -212,6 +219,7 @@ class TestLibsmlParsingISKRA:
 
     def test_processing_invalid_delta_field_name(self):
         """Test main loop with a window size and threshold-delta."""
+
         def messages_handler(messages):
             # invalid delta field-name => no filtering based on delta
             # => return all messages (because of big window size)
@@ -299,8 +307,8 @@ class TestLibsmlParsingEMH:
                                  'total': 5378499.0,
                                  'total_tariff1': 5378499.0,
                                  'total_tariff2': 0.0}] or \
-                   messages == [{'time': 118137423, 'total': 5378499.1,
-                                 'total_tariff1': 5378499.1, 'total_tariff2': 0.0}]
+                messages == [{'time': 118137423, 'total': 5378499.1,
+                              'total_tariff1': 5378499.1, 'total_tariff2': 0.0}]
 
         stmp.processing_loop(self.istream, 1, messages_handler, timeout=2)
 
@@ -326,10 +334,10 @@ class TestMqtt:
 
     def test_send(self, monkeypatch):
 
-        def connect_dummy(client, host, port=1883, keepalive=60, bind_address=""):
+        def connect_dummy(_, host, port=1883):
             print("CONNECT DUMMY", host, port)
 
-        def publish_dummy(client, topic, payload=None, qos=0, retain=False):
+        def publish_dummy(_, topic, payload=None):
             print(topic, payload)
             # we expect multiple messages, multiple topics
             assert topic.startswith('tele/smartmeter')
@@ -399,18 +407,21 @@ class TestMqttSingleTopic:
     """
 
     def test_send(self, monkeypatch):
-
-        def connect_dummy(client, host, port=1883, keepalive=60, bind_address=""):
+        def connect_dummy(_, host, port=1883):
             print("CONNECT DUMMY", host, port)
 
-        def publish_dummy(client, topic, payload=None, qos=0, retain=False):
+        def publish_dummy(_, topic, payload=None):
             print(topic, payload)
             assert topic == 'tele/smartmeter'
             # everything as just one single topic, payload as JSON
             # use json.dumps to compare the two dictionaries
             # (NOTE: dictionary sorting varies between Python versions and platforms!)
             actual = json.loads(payload)
-            expected = {"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3}, "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22, "max": 99}, "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222, "min": 111, "max": 333}}
+            expected = {"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3},
+                        "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22,
+                                   "max": 99},
+                        "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222,
+                                            "min": 111, "max": 333}}
             assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
         # monkey patching

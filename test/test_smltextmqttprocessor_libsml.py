@@ -18,6 +18,7 @@ import smltextmqttprocessor as stmp
 
 # no docstring for tests
 # pylint: disable=missing-function-docstring
+# noqa: D102
 
 __script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -31,16 +32,16 @@ N = 0
 def __processfile(filepath, window_size):
     global N
 
-    ## reset counter
+    # reset counter
     N = 0
 
-    ## aggregation callback
+    # aggregation callback
     def data_handler(_):
-        ## just count how often this has been called
+        # just count how often this has been called
         global N
         N += 1
 
-    ## call external binary and capture STDOUT
+    # call external binary and capture STDOUT
     cmd = "%s %s" % (os.path.join(__script_dir, '../sml_server_time/sml_server_time'), filepath)
     with Popen(shlex.split(cmd), stdout=PIPE) as proc:
         stmp.processing_loop(proc.stdout, window_size, data_handler, timeout=1)

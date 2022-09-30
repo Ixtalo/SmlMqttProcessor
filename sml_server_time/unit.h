@@ -94,7 +94,7 @@ dlms_unit_t dlms_units[] = {
 {60, "Wh/m³"},		// energy per volume					3,6*103 J/m³
 {61, "J/m³"},		// calorific value, wobbe
 {62, "Mol %"},		// molar fraction of		mole percent		(Basic gas composition unit)
-			// gas composition  
+			// gas composition
 {63, "g/m³"},		// mass density, quantity of material			(Gas analysis, accompanying elements)
 {64, "Pa s"},		// dynamic viscosity pascal second			(Characteristic of gas stream)
 {253, "(reserved)"},	// reserved
@@ -102,7 +102,7 @@ dlms_unit_t dlms_units[] = {
 {255, "(unitless)"},	// no unit, unitless, count
 {0, ""}		// stop condition for iterator
 };
-	
+
 const char * dlms_get_unit(unsigned char code) {
 	dlms_unit_t *it = dlms_units;
 	do { // linear search
@@ -110,6 +110,6 @@ const char * dlms_get_unit(unsigned char code) {
 			return it->unit;
 		}
 	} while ((++it)->code);
-	
+
 	return NULL; // not found
 }
