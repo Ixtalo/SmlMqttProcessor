@@ -64,9 +64,9 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.9.1"
+__version__ = "1.10.0"
 __date__ = "2020-04-21"
-__updated__ = "2022-09-29"
+__updated__ = "2022-09-30"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -328,7 +328,7 @@ def parse_line(line):
     return None
 
 
-def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None, deltas_rel=None):
+def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
     """
     Main processing loop on input stream.
     If size of rolling window is reached then call handler function mqtt_or_println.
@@ -338,8 +338,7 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None, 
     :param window_size: rolling window size, size of aggregation window
     :param callback: reference to messages handling callback function
     :param timeout: timeout in seconds, 0 for no timeout
-    :param deltas_abs: dictionary fieldname->float with absolute difference (delta) thresholds
-    :param deltas_rel: dictionary fieldname->float with relative difference (delta) thresholds
+    :param deltas: dictionary fieldname->float with difference (delta) thresholds
     :return: Nothing
     """
     message = {}
@@ -376,35 +375,27 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas_abs=None, 
                 logging.info("window (%d) filled, handling #%d messages...", window_size, mn)
                 callback(messages)  # handle all messages
                 messages = []       # start a new collection
-            elif deltas_abs and mn >= 2:
+            elif deltas and mn >= 2:
                 # dynamic checking of all fields in message according to declared delta-thresholds
-                for field_name, delta_val in deltas_abs.items():
+                for field_name, delta_value in deltas.items():
                     if field_name not in messages[-2] or field_name not in messages[-1]:
                         logging.warning("No such field with name '%s' in message!", field_name)
                         continue
+
+                    # compute delta/difference of the latest 2 messages
                     prev = messages[-2][field_name]
                     curr = messages[-1][field_name]
                     delta = abs(prev - curr)
                     logging.debug("delta: %.1f, prev: %.1f, curr: %.1f, field: %s",
                                   delta, prev, curr, field_name)
-                    if delta >= delta_val:
-                        logging.info("field '%s', delta: %d, above absolute threshold (%d), handling...",
-                                     field_name, delta, delta_val)
-                        callback(messages)  # handle all messages
-                        messages = []       # start a new collection
-                        # stop delta stuff, i.e., only 1 handling when delta event happens
-                        break
-            elif deltas_rel and mn >= 2:
-                for field_name, ratio in deltas_rel.items():
-                    if field_name not in messages[-2] or field_name not in messages[-1]:
-                        logging.warning("No such field with name '%s' in message!", field_name)
-                        continue
-                    prev = messages[-2][field_name]
-                    curr = messages[-1][field_name]
-                    delta = abs(prev - curr)
-                    if delta >= ratio * curr:
-                        logging.info("field '%s', delta: %d, above relative threshold (%.2f), handling...",
-                                     field_name, delta, ratio)
+
+                    # determine if there's a change
+                    # if 0 <= delta_value <= 1 then use relative (percentage), else absolute
+                    is_change = delta >= delta_value * curr if delta_value < 1 else delta >= delta_value
+
+                    if is_change:
+                        logging.info("field '%s', delta: %d, above threshold (%d), handling...",
+                                     field_name, delta, delta_value)
                         callback(messages)  # handle all messages
                         messages = []       # start a new collection
                         # stop delta stuff, i.e., only 1 handling when delta event happens
@@ -474,26 +465,18 @@ def main():
         logging.info("Configuration: %s", {**config.defaults(), **dict(config.items())})
 
     # set the threshold deltas from config
-    deltas_abs = {}
-    if config.has_section("DeltaThresholdsAbsolute"):
-        for name, value in config.items("DeltaThresholdsAbsolute"):
+    deltas = {}
+    if config.has_section("DeltaThresholds"):
+        for name, value in config.items("DeltaThresholds"):
             if name in config.defaults():
                 # do not include options of the DEFAULT section
                 continue
-            value = config.getfloat("DeltaThresholdsAbsolute", name)
-            assert value >= 0
-            deltas_abs[name] = value
-        logging.info("DeltaThresholdsAbsolute: %s", deltas_abs)
-    deltas_rel = {}
-    if config.has_section("DeltaThresholdsPercent"):
-        for name, value in config.items("DeltaThresholdsPercent"):
-            if name in config.defaults():
-                # do not include options of the DEFAULT section
-                continue
-            value = config.getfloat("DeltaThresholdsPercent", name)
-            assert 0 <= value <= 1
-            deltas_rel[name] = value
-        logging.info("DeltaThresholdsPercent: %s", deltas_rel)
+            value = config.getfloat("DeltaThresholds", name)
+            if value > 0:
+                deltas[name] = value
+            else:
+                logging.warning("Invalid value for DeltaThresholds '%s'!", name)
+        logging.info("DeltaThresholds: %s", deltas)
 
     # rolling window period
     window_size = config.getint(configparser.DEFAULTSECT, 'block_size', fallback=30)
@@ -521,7 +504,7 @@ def main():
 
     # main processing loop on input stream
     # if size of rolling window is reached then call handler function mqtt_or_println
-    processing_loop(istream, window_size, mqtt_or_println, deltas_abs=deltas_abs, deltas_rel=deltas_rel)
+    processing_loop(istream, window_size, mqtt_or_println, deltas=deltas)
 
     return ExitCodes.OK
 

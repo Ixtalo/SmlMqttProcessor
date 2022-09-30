@@ -110,6 +110,12 @@ class TestLibsmlParsingISKRA:
             1-0:1.8.0*255#120.1#Wh
             1-0:16.7.0*255#32.2#W
             act_sensor_time#4#
+            
+            1-0:96.50.1*1#ISK#
+            1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
+            1-0:1.8.0*255#125.1#Wh
+            1-0:16.7.0*255#30.6#W
+            act_sensor_time#5#
             """)
         self.istream.seek(0)
 
@@ -127,20 +133,22 @@ class TestLibsmlParsingISKRA:
             assert messages in ([{'actual': 1.1, 'time': 1, 'total': 10.1}],
                                 [{'actual': 22.2, 'time': 2, 'total': 100.1}],
                                 [{'actual': 122.2, 'time': 3, 'total': 110.1}],
-                                [{'actual': 32.2, 'time': 4, 'total': 120.1}])
+                                [{'actual': 32.2, 'time': 4, 'total': 120.1}],
+                                [{'actual': 30.6, 'time': 5, 'total': 125.1}])
 
         stmp.processing_loop(self.istream, 1, messages_handler, timeout=self.TIMEOUT)
 
     def test_processing_loop_window2(self):
         """Test main loop with a window size."""
         def messages_handler(messages):
-            # this handler will be called n/2 times for n messages in self.istream
+            # this handler will be called 4/2+1=5 times for 5 messages in self.istream
             # because of window_size=2
             # pylint: disable=consider-using-in
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1}] or \
                    messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
-                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+                                {'actual': 32.2, 'time': 4, 'total': 120.1}] or \
+                   messages == [{'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         stmp.processing_loop(self.istream, 2, messages_handler, timeout=self.TIMEOUT)
 
@@ -151,50 +159,71 @@ class TestLibsmlParsingISKRA:
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1},
                                 {'actual': 122.2, 'time': 3, 'total': 110.1},
-                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+                                {'actual': 32.2, 'time': 4, 'total': 120.1},
+                                {'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         stmp.processing_loop(self.istream, 99, messages_handler, timeout=self.TIMEOUT)
 
     def test_processing_loop_window2_delta50(self):
         """Test main loop with a window size and threshold-delta."""
         def messages_handler(messages):
-            # 3 messages because of delta-threshold 122 >= 50
+            # 3 messages because of delta-threshold 122 >= 50, then the rest
             # => immediate threshold-based reaction
             # pylint: disable=consider-using-in
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1},
                                 {'actual': 122.2, 'time': 3, 'total': 110.1}] or \
-                   messages == [{'actual': 32.2, 'time': 4, 'total': 120.1}]    # the rest...
+                   messages == [{'actual': 32.2, 'time': 4, 'total': 120.1},
+                                {'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         deltas = {"actual": 50}
         stmp.processing_loop(self.istream, 99, messages_handler,
-                             timeout=self.TIMEOUT, deltas_abs=deltas)
+                             timeout=self.TIMEOUT, deltas=deltas)
 
-    def test_processing_loop_window2_delta150(self):
+    def test_processing_loop_window2_delta200(self):
         """Test main loop with a window size and threshold-delta."""
         def messages_handler(messages):
-            # all 4 messages because of delta-threshold 112 !>= 150
+            # all messages because of high delta-threshold
             # => no immediate (threshold-based) reaction
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1},
                                 {'actual': 122.2, 'time': 3, 'total': 110.1},
-                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+                                {'actual': 32.2, 'time': 4, 'total': 120.1},
+                                {'actual': 30.6, 'time': 5, 'total': 125.1}]
 
-        deltas = {"actual": 150}
+        deltas = {"actual": 200}
         stmp.processing_loop(self.istream, 99, messages_handler,
-                             timeout=self.TIMEOUT, deltas_abs=deltas)
+                             timeout=self.TIMEOUT, deltas=deltas)
+
+    def test_processing_loop_window2_delta10percent(self):
+        """Test main loop with a window size and threshold-delta."""
+        def messages_handler(messages):
+            # this handler will be called 3 times because of 10 % delta and 2 changes
+            # pylint: disable=consider-using-in
+            assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
+                                {'actual': 22.2, 'time': 2, 'total': 100.1}] or \
+                   messages == [{'actual': 122.2, 'time': 3, 'total': 110.1},
+                                {'actual': 32.2, 'time': 4, 'total': 120.1}] or \
+                   messages == [{'actual': 30.6, 'time': 5, 'total': 125.1}]
+
+        deltas = {"actual": 0.1}
+        stmp.processing_loop(self.istream, 99, messages_handler,
+                             timeout=self.TIMEOUT, deltas=deltas)
 
     def test_processing_invalid_delta_field_name(self):
         """Test main loop with a window size and threshold-delta."""
         def messages_handler(messages):
+            # invalid delta field-name => no filtering based on delta
+            # => return all messages (because of big window size)
             assert messages == [{'actual': 1.1, 'time': 1, 'total': 10.1},
                                 {'actual': 22.2, 'time': 2, 'total': 100.1},
                                 {'actual': 122.2, 'time': 3, 'total': 110.1},
-                                {'actual': 32.2, 'time': 4, 'total': 120.1}]
+                                {'actual': 32.2, 'time': 4, 'total': 120.1},
+                                {'actual': 30.6, 'time': 5, 'total': 125.1}]
 
         deltas = {"ISINVALID": 1}
         stmp.processing_loop(self.istream, 99, messages_handler,
-                             timeout=self.TIMEOUT, deltas_abs=deltas)
+                             timeout=self.TIMEOUT, deltas=deltas)
 
     def test_processing_loop_invalid(self):
         """Test main loop with invalid data."""
