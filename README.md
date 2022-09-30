@@ -21,7 +21,7 @@ Concept:
 
 ## Motivation
 
-I want to monitor the live/current power consumption, 
+I want to monitor the live/current power consumption,
 and I want the values as MQTT messages.
 
 - Know the current power consumption, e.g., to detect peaks, evaluate power production by photovoltaic system, save electricity, etc.
@@ -31,7 +31,7 @@ and I want the values as MQTT messages.
 
 
 ## Requirements
-* 
+*
 * Python 3.5+
     * Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
 * Python pipenv
@@ -48,7 +48,7 @@ Hardware and runtime requirements:
 
 1. `git clone --recurse-submodules` this repository
    * ATTENTION: `--recurse-submodules` is needed (e.g., for libsml)!
-2. `pipenv --site-packages sync` 
+2. `pipenv --site-packages sync`
 3. Build `sml_server_time`, see [sml_server_time/README.md](sml_server_time/README.md).
 4. Run in activated virtualenv and study CLI help:
    `pipenv run python smltextmqttprocessor.py --help`
