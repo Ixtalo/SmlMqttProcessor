@@ -144,7 +144,7 @@ void transport_receiver(unsigned char *buffer, size_t buffer_len) {
 					fflush(stdout);
 				}
 			}
-			
+
 			// modification
 			printf("act_sensor_time#%u#\n", *body->act_sensor_time->data.sec_index);
 

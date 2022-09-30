@@ -20,22 +20,22 @@ Options:
   --version       Show version.
 """
 ##
-## LICENSE:
+# LICENSE:
 ##
-## Copyright (C) 2020 Alexander Streicher
+# Copyright (C) 2020 Alexander Streicher
 ##
-## This program is free software: you can redistribute it and/or modify
-## it under the terms of the GNU Affero General Public License as published by
-## the Free Software Foundation, either version 3 of the License, or
-## (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 ##
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU Affero General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
 ##
-## You should have received a copy of the GNU Affero General Public License
-## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ##
 import os
 import sys
@@ -45,11 +45,11 @@ import statistics
 
 from codecs import open
 from docopt import docopt
-## PySerial, https://pypi.org/project/pyserial/
+# PySerial, https://pypi.org/project/pyserial/
 import serial
-## https://pypi.org/project/paho-mqtt/#usage-and-api
+# https://pypi.org/project/paho-mqtt/#usage-and-api
 import paho.mqtt.client as mqtt
-## PySML, https://pypi.org/project/pysml/
+# PySML, https://pypi.org/project/pysml/
 import sml
 
 __version__ = "1.0"
@@ -71,7 +71,7 @@ TESTRUN = 0
 PROFILE = 0
 __script_dir = os.path.dirname(os.path.realpath(__file__))
 
-## check for Python3
+# check for Python3
 if sys.version_info < (3, 0):
     sys.stderr.write("Minimum required version is Python 3.x!\n")
     sys.exit(1)
@@ -89,13 +89,14 @@ def on_disconnect(client, userdata, rc):
 
 def main():
     arguments = docopt(__doc__, version="SmlMqttProcessor %s (%s)" % (__version__, __updated__))
-    if DEBUG: print(arguments)
+    if DEBUG:
+        print(arguments)
 
     arg_configfile = arguments['<config-file.ini>']
     arg_verbose = arguments['--verbose']
     arg_quiet = arguments['--quiet']
 
-    ## setup logging
+    # setup logging
     logging.basicConfig(level=logging.WARNING,
                         format='%(asctime)s %(levelname)-8s %(name)-10s %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
@@ -108,18 +109,18 @@ def main():
     elif arg_quiet:
         logging.getLogger('').setLevel(logging.ERROR)
 
-    ## Configuration
+    # Configuration
     config = configparser.ConfigParser()
     config.read(arg_configfile)
 
-    ## PySerial
+    # PySerial
     ser = serial.Serial(config.get('Serial', 'port'),
                         baudrate=config.get('Serial', 'baudrate', fallback=9600),
                         timeout=config.getfloat('Serial', 'timeout', fallback=1.0)
                         )
     logging.info("Serial port: %s", str(ser))
 
-    ## MQTT
+    # MQTT
     client = mqtt.Client()
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
@@ -128,11 +129,11 @@ def main():
     client.reconnect_delay_set(min_delay=1, max_delay=120)
     client.connect(config.get('Mqtt', 'host'), port=config.getint('Mqtt', 'port', fallback=1883))
 
-    ## SML parser
+    # SML parser
     s = sml.SmlBase()
     logging.getLogger('sml').setLevel(logging.WARNING)  ## lot's of debugging output!
 
-    ## Rolling window period
+    # Rolling window period
     block_size = config.getint(configparser.DEFAULTSECT, 'block_size')
     logging.info('Block size: %d', block_size)
     client.publish("tele/smartmeter/block/size", block_size)
@@ -145,37 +146,37 @@ def main():
         if len(a_total) > block_size:
             logging.warning('%d errors since last block finish', n_errors)
 
-            ## MQTT publishing
+            # MQTT publishing
             client.publish("tele/smartmeter/block/errors", n_errors)
             client.publish("tele/smartmeter/sensor_time/value", a_times[-1])
             client.publish("tele/smartmeter/power/total/value", a_total[-1])
             client.publish("tele/smartmeter/power/actual/mean", round(statistics.mean(a_actual)))
 
-            ## reset
+            # reset
             a_total = []
             a_actual = []
             a_times = []
             n_errors = 0
 
-        ## read from input stream/serial port
-        ## must be >= 216 bytes (typical size of 1 SML packet for ISKRA smartmeter)
+        # read from input stream/serial port
+        # must be >= 216 bytes (typical size of 1 SML packet for ISKRA smartmeter)
         buffer = ser.read(400)
         logging.debug("%d bytes read", len(buffer))
 
-        ## check if data contains SML packet
+        # check if data contains SML packet
         if not (SML_START in buffer and SML_END in buffer):
             logging.warning("No SML packet indicators found!")
             continue
 
-        ## parse SML
+        # parse SML
         frame = None
         try:
-            ## extract SML packet bytes
+            # extract SML packet bytes
             p0, p1 = buffer.index(SML_START), buffer.index(SML_END)
             packet = buffer[p0:p0 + p1 + len(SML_END) + 3]
-            ## parse SML
-            ## result if ok: nf=(nbytes, frame)
-            ## result if no data: nf=0
+            # parse SML
+            # result if ok: nf=(nbytes, frame)
+            # result if no data: nf=0
             nf = s.parse_frame(packet)
             if len(nf) == 2:
                 frame = nf[1]
@@ -190,8 +191,8 @@ def main():
             n_errors += 1
             continue
 
-        ## find relevant messageBody in valList
-        ## and convert its objects to a simple dictionary
+        # find relevant messageBody in valList
+        # and convert its objects to a simple dictionary
         data = {}
         for entry in frame:
             if 'messageBody' in entry and SML_SENSOR_TIME in entry['messageBody']:
@@ -204,9 +205,10 @@ def main():
                         data[obj_name] = value
                 break
 
-        if DEBUG: logging.debug(data)
+        if DEBUG:
+            logging.debug(data)
 
-        ## record values
+        # record values
         a_total.append(data[SML_POWER_TOTAL])
         a_actual.append(data[SML_POWER_ACTUAL])
         a_times.append(data[SML_SENSOR_TIME])

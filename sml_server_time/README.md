@@ -7,7 +7,7 @@ Based on libsml version [6609c8117ba](https://github.com/volkszaehler/libsml/tre
 
 
 ## Motivation
-Normal `sml_server` example binary from libsml does not output the act_sensor_time field. 
+Normal `sml_server` example binary from libsml does not output the act_sensor_time field.
 But when gathering the smart meter data it is reasonable to also include the data's original time.
 
 
@@ -26,11 +26,11 @@ printf("act_sensor_time#%u#\n", *body->act_sensor_time->data.sec_index);
 Then use binary `sml_server_time` on byte stream / serial port.
 
 
-## Example 
-After building, run on SML binary data:  
+## Example
+After building, run on SML binary data:
 `./sml_server_time ../example/ISKRA_MT691_eHZ-MS2020.bin`
- 
-This should decode the SML binary data and produce a textual output like:   
+
+This should decode the SML binary data and produce a textual output like:
 ```
 1-0:96.50.1*1#ISK#
 1-0:96.1.0*255#0a 01 49 53 4b 00 04 32 5e c5 #
