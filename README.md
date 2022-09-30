@@ -31,7 +31,7 @@ and I want the values as MQTT messages.
 
 
 ## Requirements
-*
+
 * Python 3.5+
     * Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
 * Python pipenv
