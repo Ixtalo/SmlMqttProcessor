@@ -24,6 +24,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip pipenv
         pipenv sync --dev
+        pipenv install --dev pytest pytest-cov pytest-sugar
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
