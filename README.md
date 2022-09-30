@@ -20,20 +20,21 @@ Concept:
 
 
 ## Motivation
-I wanted to have the current power consumption of the last minute as MQTT messages.
 
-So:
-- Need to know the current power consumption, e.g., to detect peaks, evaluate power production by photovoltaic system, save electricity, etc.
-- The power grid operator installed a power smater meter which has an reading interface. The data is sent out via optical interface *every second*, encoded as SML messages.
-- Data for each second is to much (and can have high variance), so aggregate the data for a time window (e.g., 1 minute) to produce mean, median, min/max, etc.
-- Send that aggregated data as MQTT messages.
+I want to monitor the live/current power consumption, 
+and I want the values as MQTT messages.
+
+- Know the current power consumption, e.g., to detect peaks, evaluate power production by photovoltaic system, save electricity, etc.
+- The power grid operator installed a power smart meter which has an optical interface. This interface tells about the actual/current power consumption, encoded as SML messages.
+- Aggregate the every-minute data for a time window (e.g., 1 minute) to produce mean, median, min/max, etc.
+- Periodically (e.g., 1 minute) publish that aggregated data as MQTT messages.
 
 
 ## Requirements
+* 
 * Python 3.5+
     * Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
-* python3-pip
-  * For reference on actually used Python modules and versions see [requirements.freeze](./requirements.freeze).
+* Python pipenv
 * wget
 * [volkszaehler/libsml](https://github.com/volkszaehler/libsml), version [6609c8117ba](https://github.com/volkszaehler/libsml/tree/6609c8117ba2c987aea386a7fffb9b4746636be6)
 
@@ -44,29 +45,28 @@ Hardware and runtime requirements:
 
 
 ## Setup & How-To
+
 1. `git clone --recurse-submodules` this repository
-   * ATTENTION: `--recurse-submodules` is needed!
-2. Build `sml_server_time`, see [sml_server_time/README.md](sml_server_time/README.md).
-3. Generate Python virtual environment allowing access to the system's Python packages:
-   `python -m virtualenv --python=python3.5 --system-site-packages venv`
-4. Activate virtualenv:
-   `source ./venv/bin/activate`
-5. Run in activated virtualenv and study CLI help:
-   `python smltextmqttprocessor.py --help`
-6. Create local configuration file and adjust settings:
+   * ATTENTION: `--recurse-submodules` is needed (e.g., for libsml)!
+2. `pipenv --site-packages sync` 
+3. Build `sml_server_time`, see [sml_server_time/README.md](sml_server_time/README.md).
+4. Run in activated virtualenv and study CLI help:
+   `pipenv run python smltextmqttprocessor.py --help`
+5. Create local configuration file and adjust settings:
    `cp config.template.ini config.local.ini`
    * MQTT configuration: server host, port, user/password
      * `single_topic` boolean switch for all data in one single MQTT topic (default is `false`)
    * Serial port configuration
    * Block/Window size (for data aggregation)
-7. Run in activated virtualenv:
-   `./sml_server_time/sml_server_time /dev/ttyAMA0 | python smltextmqttprocessor.py --config config.local.ini -`
+6. Run in activated virtualenv:
+   `./sml_server_time/sml_server_time /dev/ttyAMA0 | pipenv run python smltextmqttprocessor.py --config config.local.ini -`
 
 
 ### Run at Boot Time
+
 After setting up, use systemd script in [./scripts/systemd/](./scripts/systemd/).
 Basically it runs:
-`ExecStart=/bin/sh -c '/opt/SmlMqttProcessor/sml_server_time/sml_server_time /dev/ttyAMA0 | /opt/SmlMqttProcessor/venv/bin/python3 /opt/SmlMqttProcessor/smltextmqttprocessor.py -q config.local.ini -'`
+`ExecStart=/bin/sh -c '/opt/smlmqttprocessor/sml_server_time/sml_server_time /dev/ttyAMA0 | /opt/smlmqttprocessor/.venv/bin/python3 /opt/smlmqttprocessor/smltextmqttprocessor.py --config config.local.ini -q -'`
 
 
 
@@ -81,19 +81,9 @@ The processing pipeline is:
 
 ### Sensor Hardware
 
-I use the TTL IR read-write reader as specified on [volkszaehler.org](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang).
+![IR Sensor](./doc/ir_reader.jpg)
 
-![IR Reader](doc/ir-reader_1.jpg)
-![IR Reader](doc/ir-reader_2.jpg)
-
-
-#### SML Reading Problems
-
-If anybody else has problems reading valid SML:
-I had some real problems working with my power meter and the IR TTL sensor reader. The normal, intended placement using the magnet and directly placing it on the IR window did not yield any valid SML data, but only garbage. However, a periodicity could be observed. After tedious experiments I found out that I need a very specific spacial and rotary alignment of the sensor, see the images above. I had to put a specific distance between the sensor and the meter's IR window; I used magnets for that. With this I get valid SML packages. But even little translatory or rotary deviation leeds to invalid SML messages.
-Further experiments showed that the IR TTL sensor was faulty.
-If you experience similar problems, you should change (or repair) your sensor.
-
+TTL IR read-write reader, see [volkszaehler.org](https://wiki.volkszaehler.org/hardware/controllers/ir-schreib-lesekopf-ttl-ausgang).
 
 
 ### Input
@@ -152,6 +142,7 @@ act_sensor_time#6825875#
 
 
 ### Output
+
 The output on MQTT is like this (for multi-topic sending, config setting `single_topic=false`, which is the default):
 ```
 tele/smartmeter/time/first 11824115
@@ -179,6 +170,7 @@ tele/smartmeter {
 
 
 ## SML Links
+
 * https://github.com/volkszaehler/libsml
 * https://de.wikipedia.org/wiki/Smart_Message_Language
 * https://www.msxfaq.de/sonst/bastelbude/smartmeter_d0_sml_protokoll.htm
@@ -190,4 +182,5 @@ tele/smartmeter {
 
 
 ## License
+
 AGPL3, see [LICENSE.md](LICENSE.md).
