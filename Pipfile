@@ -12,14 +12,12 @@ typing = "~=3.7"
 [dev-packages]
 pre-commit = "*"
 pylint = "*"
-flake8 = "*"
-sync = "*"
-pytest = {version = "*", markers="python_version >= '3.8'"}
-pytest-cov = {version = "*", markers="python_version >= '3.8'"}
-pytest-sugar = {version = "*", markers="python_version >= '3.8'"}
-pytest-clarity = {version = "*", markers="python_version >= '3.8'"}
-pytest-icdiff = {version = "*", markers="python_version >= '3.8'"}
+pytest = "*"
+pytest-sugar = "*"
+pytest-cov = "*"
+pytest-clarity = "*"
+pytest-icdiff = "*"
 
 [scripts]
-cov = "pipenv run pytest --cov --cov-report=html --cov-report=xml --cov-report=term"
+cov = "pipenv run pytest -p no:pytest-services --cov=. --cov-report=html --cov-report=xml --cov-report=term"
 check = "pre-commit run --all-files"
