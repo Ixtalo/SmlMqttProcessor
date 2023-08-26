@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 __date__ = "2020-04-21"
 __updated__ = "2023-08-26"
 __author__ = "Ixtalo"
@@ -238,7 +238,6 @@ class MyMqtt:
             result[name]['mean'] = round(statistics.mean(values), 1)
             result[name]['min'] = min(values)
             result[name]['max'] = max(values)
-            result[name]['sum'] = round(sum(values), 1)
             result[name]['stdev'] = round(statistics.stdev(values), 1)
         return result
 

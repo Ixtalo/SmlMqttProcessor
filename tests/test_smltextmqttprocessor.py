@@ -401,7 +401,6 @@ class TestMqtt:
                                'median': 16.6,
                                'min': -22.2,
                                'stdev': 43.3,
-                               'sum': 133.2,
                                'value': 99.9},
                     'time': {'first': 111.1, 'last': 333.3},
                     'total': {'first': 1.111,
@@ -437,7 +436,6 @@ class TestMqttSingleTopic:
                     "median": 16.6,
                     "min": -22.2,
                     "stdev": 43.3,
-                    "sum": 133.2,
                     "value": 99.9
                 },
                 "total": {
