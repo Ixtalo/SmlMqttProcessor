@@ -64,7 +64,7 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.11.1"
+__version__ = "1.12.0"
 __date__ = "2020-04-21"
 __updated__ = "2023-08-26"
 __author__ = "Ixtalo"
