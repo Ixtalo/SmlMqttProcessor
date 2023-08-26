@@ -406,13 +406,8 @@ class TestMqtt:
                     'time': {'first': 111.1, 'last': 333.3},
                     'total': {'first': 1.111,
                               'last': 3.333,
-                              'max': 3.333,
-                              'mean': 2.2,
-                              'median': 2.2,
-                              'min': 1.111,
-                              'stdev': 1.1,
-                              'sum': 6.7,
-                              'value': 3.333}}
+                              'value': 3.333}
+                    }
         assert actual == expected
 
 
@@ -448,12 +443,6 @@ class TestMqttSingleTopic:
                 "total": {
                     "first": 1.111,
                     "last": 3.333,
-                    "max": 3.333,
-                    "mean": 2.2,
-                    "median": 2.2,
-                    "min": 1.111,
-                    "stdev": 1.1,
-                    "sum": 6.7,
                     "value": 3.333
                 }
             }

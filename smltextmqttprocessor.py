@@ -224,6 +224,12 @@ class MyMqtt:
             if not values:
                 # could be empty, e.g. if no such data has been observed
                 continue
+            if name == "total":
+                result[name] = {}
+                result[name]['value'] = values[-1]
+                result[name]['first'] = values[0]
+                result[name]['last'] = values[-1]
+                continue
             result[name] = {}
             result[name]['value'] = values[-1]
             result[name]['first'] = values[0]
