@@ -394,10 +394,25 @@ class TestMqtt:
         # run / test
         mymqtt = stmp.MyMqtt(config)
         actual = mymqtt.construct_mqttdata(data)
-        expected = {'time': {'first': 111, 'last': 333},
-                    'total': {'value': 3, 'first': 1, 'last': 3, 'median': 2, 'mean': 2, 'min': 1, 'max': 3},
-                    'actual': {'value': 99, 'first': -11, 'last': 99, 'median': 16.5, 'mean': 22, 'min': -22,
-                               'max': 99}}
+        expected = {'actual': {'first': -11,
+                               'last': 99,
+                               'max': 99,
+                               'mean': 22,
+                               'median': 16,
+                               'min': -22,
+                               'stdev': 43,
+                               'sum': 132,
+                               'value': 99},
+                    'time': {'first': 111, 'last': 333},
+                    'total': {'first': 1,
+                              'last': 3,
+                              'max': 3,
+                              'mean': 2,
+                              'median': 2,
+                              'min': 1,
+                              'stdev': 1,
+                              'sum': 6,
+                              'value': 3}}
         assert actual == expected
 
 
@@ -417,11 +432,12 @@ class TestMqttSingleTopic:
             # use json.dumps to compare the two dictionaries
             # (NOTE: dictionary sorting varies between Python versions and platforms!)
             actual = json.loads(payload)
-            expected = {"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3},
-                        "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22,
-                                   "max": 99},
-                        "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222,
-                                            "min": 111, "max": 333}}
+            expected = {"act_sensor_time": {"first": 111, "last": 333, "max": 333, "mean": 222,
+                                            "median": 222, "min": 111, "stdev": 111, "sum": 666, "value": 333},
+                        "actual": {"first": -11, "last": 99, "max": 99, "mean": 22, "median": 16,
+                                   "min": -22, "stdev": 43, "sum": 132, "value": 99},
+                        "total": {"first": 1, "last": 3, "max": 3, "mean": 2, "median": 2,
+                                  "min": 1, "stdev": 1, "sum": 6, "value": 3}}
             assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
         # monkey patching
