@@ -6,7 +6,7 @@ import io
 import json
 from configparser import ConfigParser
 import pytest
-import smltextmqttprocessor as stmp
+import smlmqttprocessor.smltextmqttprocessor as stmp
 
 
 # f-string does not work with Python 3.5
