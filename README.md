@@ -34,8 +34,8 @@ and I want the values as MQTT messages.
 ## Requirements
 
 * Python 3.5+
-    * Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
-* Poetry (install with `python3 -m pip install -U --user poetry`)
+    * Note: Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
+* Poetry (see https://python-poetry.org/docs/#installation)
 * wget
 * [volkszaehler/libsml](https://github.com/volkszaehler/libsml), version [6609c8117ba](https://github.com/volkszaehler/libsml/tree/6609c8117ba2c987aea386a7fffb9b4746636be6)
 
