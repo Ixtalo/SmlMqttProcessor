@@ -187,4 +187,4 @@ tele/smartmeter {
 
 ## License
 
-AGPL3, see [LICENSE.md](LICENSE.md).
+AGPL3, see [LICENSE](LICENSE).
