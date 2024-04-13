@@ -1,16 +1,16 @@
 [tool.poetry]
 name = "smlmqttprocessor"
-version = "1.14.0"
+version = "1.14.1"
 description = "Process SML from libsml-sml_server and send it to MQTT."
 authors = ["Ixtalo <ixtalo@users.noreply.github.com>"]
 readme = "README.md"
 license = "AGPL"
 
 [tool.poetry.dependencies]
-python = "^3.5"
-docopt = "~=0.6"
+python = ">=3.7,<4.0"
+docopt = "*"
 paho-mqtt = "~=1.6"
-pysml = "==0.0.2"
+pysml = "~=0.1.2"
 typing = "~=3.7"
 
 [tool.poetry.group.dev.dependencies]
@@ -20,7 +20,6 @@ pytest = "*"
 pytest-sugar = "*"
 pytest-cov = "*"
 pytest-clarity = "*"
-pytest-icdiff = "*"
 
 [build-system]
 requires = ["poetry-core"]
@@ -49,3 +48,11 @@ testpaths = ["tests",]
 ## https://coverage.readthedocs.io/en/latest/source.html#source
 [tool.coverage.run]
 omit = ["tests/*", "__init__.py"]
+
+## https://github.com/hhatto/autopep8?tab=readme-ov-file#configuration
+[tool.autopep8]
+max_line_length = 120
+ignore = "E501,W6"  # or ["E501", "W6"]
+in-place = true
+recursive = true
+aggressive = 3
