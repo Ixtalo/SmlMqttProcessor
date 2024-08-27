@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "smlmqttprocessor"
-version = "1.14.1"
+version = "1.15.0"
 description = "Process SML from libsml-sml_server and send it to MQTT."
 authors = ["Ixtalo <ixtalo@users.noreply.github.com>"]
 readme = "README.md"
