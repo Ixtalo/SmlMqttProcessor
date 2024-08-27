@@ -6,7 +6,7 @@ import io
 import json
 from configparser import ConfigParser
 import pytest
-import smltextmqttprocessor as stmp
+import smlmqttprocessor.smltextmqttprocessor as stmp
 
 
 # f-string does not work with Python 3.5
@@ -385,19 +385,28 @@ class TestMqtt:
 
     def test_construct_data(self):
         data = {
-            'total': [1, 2, 3],
-            'actual': [-11, -22, 11, 22, 33, 99],
-            'time': [111, 222, 333]
+            'total': [1.111, 2.222, 3.333],
+            'actual': [-11.1, -22.2, 11.1, 22.2, 33.3, 99.9],
+            'time': [111.1, 222.2, 333.3]
         }
         config = ConfigParser()
 
         # run / test
         mymqtt = stmp.MyMqtt(config)
         actual = mymqtt.construct_mqttdata(data)
-        expected = {'time': {'first': 111, 'last': 333},
-                    'total': {'value': 3, 'first': 1, 'last': 3, 'median': 2, 'mean': 2, 'min': 1, 'max': 3},
-                    'actual': {'value': 99, 'first': -11, 'last': 99, 'median': 16.5, 'mean': 22, 'min': -22,
-                               'max': 99}}
+        expected = {'actual': {'first': -11.1,
+                               'last': 99.9,
+                               'max': 99.9,
+                               'mean': 22.2,
+                               'median': 16.6,
+                               'min': -22.2,
+                               'stdev': 43.3,
+                               'value': 99.9},
+                    'time': {'first': 111.1, 'last': 333.3},
+                    'total': {'first': 1.111,
+                              'last': 3.333,
+                              'value': 3.333}
+                    }
         assert actual == expected
 
 
@@ -417,11 +426,24 @@ class TestMqttSingleTopic:
             # use json.dumps to compare the two dictionaries
             # (NOTE: dictionary sorting varies between Python versions and platforms!)
             actual = json.loads(payload)
-            expected = {"total": {"value": 3, "first": 1, "last": 3, "median": 2, "mean": 2, "min": 1, "max": 3},
-                        "actual": {"value": 99, "first": -11, "last": 99, "median": 16.5, "mean": 22, "min": -22,
-                                   "max": 99},
-                        "act_sensor_time": {"value": 333, "first": 111, "last": 333, "median": 222, "mean": 222,
-                                            "min": 111, "max": 333}}
+            expected = {
+                "time": {"first": 111.1, "last": 333.3},
+                "actual": {
+                    "first": -11.1,
+                    "last": 99.9,
+                    "max": 99.9,
+                    "mean": 22.2,
+                    "median": 16.6,
+                    "min": -22.2,
+                    "stdev": 43.3,
+                    "value": 99.9
+                },
+                "total": {
+                    "first": 1.111,
+                    "last": 3.333,
+                    "value": 3.333
+                }
+            }
             assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
         # monkey patching
@@ -430,9 +452,9 @@ class TestMqttSingleTopic:
 
         # test data
         data = {
-            'total': [1, 2, 3],
-            'actual': [-11, -22, 11, 22, 33, 99],
-            'act_sensor_time': [111, 222, 333]
+            'total': [1.111, 2.222, 3.333],
+            'actual': [-11.1, -22.2, 11.1, 22.2, 33.3, 99.9],
+            'time': [111.1, 222.2, 333.3]
         }
         config = ConfigParser()
         config.add_section('Mqtt')

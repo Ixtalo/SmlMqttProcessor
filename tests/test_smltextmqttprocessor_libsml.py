@@ -11,7 +11,7 @@ import shlex
 from glob import iglob
 from subprocess import Popen, PIPE
 import pytest
-import smltextmqttprocessor as stmp
+import smlmqttprocessor.smltextmqttprocessor as stmp
 
 # f-string does not work with Python 3.5
 # pylint: disable=consider-using-f-string

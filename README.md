@@ -30,11 +30,12 @@ and I want the values as MQTT messages.
 - Periodically (e.g., 1 minute) publish that aggregated data as MQTT messages.
 
 
+
 ## Requirements
 
 * Python 3.5+
-    * Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
-* Python pipenv
+    * Note: Python version or code level must be compatible to the Python version on the target system, e.g., Python 3.5 for Raspbian Jessie (05/2020).
+* Poetry (see https://python-poetry.org/docs/#installation)
 * wget
 * [volkszaehler/libsml](https://github.com/volkszaehler/libsml), version [6609c8117ba](https://github.com/volkszaehler/libsml/tree/6609c8117ba2c987aea386a7fffb9b4746636be6)
 
@@ -44,14 +45,17 @@ Hardware and runtime requirements:
 
 
 
+
+
+
 ## Setup & How-To
 
 1. `git clone --recurse-submodules` this repository
    * ATTENTION: `--recurse-submodules` is needed (e.g., for libsml)!
-2. `pipenv --site-packages sync`
+2. `poetry install --only=main --sync`
 3. Build `sml_server_time`, see [sml_server_time/README.md](sml_server_time/README.md).
 4. Run in activated virtualenv and study CLI help:
-   `pipenv run python smltextmqttprocessor.py --help`
+   `poetry run python smlmqttprocessor/smltextmqttprocessor.py --help`
 5. Create local configuration file and adjust settings:
    `cp config.template.ini config.local.ini`
    * MQTT configuration: server host, port, user/password
@@ -59,14 +63,14 @@ Hardware and runtime requirements:
    * Serial port configuration
    * Block/Window size (for data aggregation)
 6. Run in activated virtualenv:
-   `./sml_server_time/sml_server_time /dev/ttyAMA0 | pipenv run python smltextmqttprocessor.py --config config.local.ini -`
+   `./sml_server_time/sml_server_time /dev/ttyAMA0 | poetry run python ./smlmqttprocessor/smltextmqttprocessor.py --config config.local.ini -`
 
 
 ### Run at Boot Time
 
 After setting up, use systemd script in [./scripts/systemd/](./scripts/systemd/).
 Basically it runs:
-`ExecStart=/bin/sh -c '/opt/smlmqttprocessor/sml_server_time/sml_server_time /dev/ttyAMA0 | /opt/smlmqttprocessor/.venv/bin/python3 /opt/smlmqttprocessor/smltextmqttprocessor.py --config config.local.ini -q -'`
+`ExecStart=/bin/sh -c '/opt/smlmqttprocessor/sml_server_time/sml_server_time /dev/ttyAMA0 | /opt/smlmqttprocessor/.venv/bin/python3 /opt/smlmqttprocessor/smlmqttprocessor/smltextmqttprocessor.py --config config.local.ini -q -'`
 
 
 
@@ -76,7 +80,7 @@ The processing pipeline is:
 
 | Input | Processing | Output |
 | ----- | ---------- | ------ |
-| Decoded SML data from IR smart meter reader | [smltextmqttprocessor.py](./smltextmqttprocessor.py) | MQTT messages |
+| Decoded SML data from IR smart meter reader | [smltextmqttprocessor.py](smlmqttprocessor/smltextmqttprocessor.py) | MQTT messages |
 
 
 ### Sensor Hardware
@@ -183,4 +187,4 @@ tele/smartmeter {
 
 ## License
 
-AGPL3, see [LICENSE.md](LICENSE.md).
+AGPL3, see [LICENSE](LICENSE).

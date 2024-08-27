@@ -26,24 +26,24 @@ Options:
   -h --help       Show this screen.
   --version       Show version.
 """
-##
+#
 # LICENSE:
-##
-# Copyright (C) 2020-2022 Alexander Streicher
-##
+#
+# Copyright (C) 2020-2023 Alexander Streicher
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-##
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
-##
+#
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-##
+#
 import configparser
 import json
 import logging
@@ -64,9 +64,9 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.10.2"
+__version__ = "1.13.0"
 __date__ = "2020-04-21"
-__updated__ = "2022-09-30"
+__updated__ = "2023-08-26"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -74,7 +74,7 @@ __status__ = "Production"
 
 ########################################################################
 # Configure the following to suit your actual smart meter configuration
-##
+#
 
 # SML OBIS fields
 # dictionary: MQTT-topic --> OBIS-code
@@ -224,14 +224,21 @@ class MyMqtt:
             if not values:
                 # could be empty, e.g. if no such data has been observed
                 continue
+            if name == "total":
+                result[name] = {}
+                result[name]['value'] = values[-1]
+                result[name]['first'] = values[0]
+                result[name]['last'] = values[-1]
+                continue
             result[name] = {}
             result[name]['value'] = values[-1]
             result[name]['first'] = values[0]
             result[name]['last'] = values[-1]
-            result[name]['median'] = statistics.median(values)
-            result[name]['mean'] = round(statistics.mean(values))
+            result[name]['median'] = round(statistics.median(values), 1)
+            result[name]['mean'] = round(statistics.mean(values), 1)
             result[name]['min'] = min(values)
             result[name]['max'] = max(values)
+            result[name]['stdev'] = round(statistics.stdev(values), 1)
         return result
 
     def send(self, field2values):
