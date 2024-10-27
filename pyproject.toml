@@ -14,6 +14,7 @@ docopt = "*"
 paho-mqtt = "~=1.6"
 pysml = "~=0.1.2"
 typing = "~=3.7"
+colorlog = "^6.8.2"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "*"
@@ -22,10 +23,6 @@ pytest = "*"
 pytest-sugar = "*"
 pytest-cov = "*"
 pytest-clarity = "*"
-
-[tool.poetry.group.server.dependencies]
-colorlog = "^6.8.2"
-pandas = "^2.2.3"
 
 [build-system]
 requires = ["poetry-core"]
