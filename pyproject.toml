@@ -1,13 +1,15 @@
 [tool.poetry]
 name = "smlmqttprocessor"
-version = "1.16.0"
+version = "1.16.1"
 description = "Process SML from libsml-sml_server and send it to MQTT."
 authors = ["Ixtalo <ixtalo@users.noreply.github.com>"]
 readme = "README.md"
 license = "AGPL"
 
 [tool.poetry.dependencies]
-python = ">=3.5,<4.0"
+# pylint 3.2 requires Python >=3.6
+# pytest 7.3 required Python >=3.7
+python = ">=3.8,<4.0" 
 docopt = "*"
 paho-mqtt = "~=1.6"
 pysml = "~=0.1.2"
