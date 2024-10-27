@@ -188,34 +188,39 @@ def get_config(configfile: Path):
     return config
 
 
-# set up logging framework
-setup_logging(level=logging.INFO if not DEBUG else logging.DEBUG)
+def main():
+    # set up logging framework
+    setup_logging(level=logging.INFO if not DEBUG else logging.DEBUG)
 
-# configuration
-config = get_config(Path('config.ini'))
-mqtt_username = config.get('Mqtt', 'username')
-mqtt_password = config.get('Mqtt', 'password')
-mqtt_host = config.get('Mqtt', 'host', fallback='localhost')
-mqtt_port = config.getint('Mqtt', 'port', fallback=1883)
-mqtt_retain = config.getboolean('Mqtt', 'retain', fallback='true')
+    # configuration
+    config = get_config(Path('config.ini'))
+    mqtt_username = config.get('Mqtt', 'username')
+    mqtt_password = config.get('Mqtt', 'password')
+    mqtt_host = config.get('Mqtt', 'host', fallback='localhost')
+    mqtt_port = config.getint('Mqtt', 'port', fallback=1883)
+    mqtt_retain = config.getboolean('Mqtt', 'retain', fallback='true')
 
-# MQTT initialization
-client = mqtt.Client(userdata=EnergyMonitor(retain=mqtt_retain))
-client.username_pw_set(username=mqtt_username, password=mqtt_password)
-client.enable_logger()
+    # MQTT initialization
+    client = mqtt.Client(userdata=EnergyMonitor(retain=mqtt_retain))
+    client.username_pw_set(username=mqtt_username, password=mqtt_password)
+    client.enable_logger()
 
-# MQTT message callbacks
-client.message_callback_add(MQTT_TOPIC_D0, handle_retained_dx_message)
-client.message_callback_add(MQTT_TOPIC_D1, handle_retained_dx_message)
-client.message_callback_add(MQTT_TOPIC_SMARTMETER_TOTAL, handle_smartmeter_message)
+    # MQTT message callbacks
+    client.message_callback_add(MQTT_TOPIC_D0, handle_retained_dx_message)
+    client.message_callback_add(MQTT_TOPIC_D1, handle_retained_dx_message)
+    client.message_callback_add(MQTT_TOPIC_SMARTMETER_TOTAL, handle_smartmeter_message)
 
-# initialize MQTT connection
-client.connect(mqtt_host, port=mqtt_port)
-# NOTE subscriptions must come *after* connect() !
-# subscribe to the retained messages
-client.subscribe(MQTT_TOPIC_D0)
-client.subscribe(MQTT_TOPIC_D1)
-# subscribe to the very topic which contains the source data
-client.subscribe(MQTT_TOPIC_SMARTMETER_TOTAL)
+    # initialize MQTT connection
+    client.connect(mqtt_host, port=mqtt_port)
+    # NOTE subscriptions must come *after* connect() !
+    # subscribe to the retained messages
+    client.subscribe(MQTT_TOPIC_D0)
+    client.subscribe(MQTT_TOPIC_D1)
+    # subscribe to the very topic which contains the source data
+    client.subscribe(MQTT_TOPIC_SMARTMETER_TOTAL)
 
-client.loop_forever()
+    client.loop_forever()
+
+
+if __name__ == "__main__":
+    main()
