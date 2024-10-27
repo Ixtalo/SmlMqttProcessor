@@ -118,7 +118,6 @@ def handle_smartmeter_message(client, _, msg):
         logging.debug("d0: %.2f", d0)
         # if there has been a retained value, use it as offset from now on
         d0 += d0_retained if d0_retained else 0
-        logging.debug("d0: %.2f", d0)
         # tell/publish
         logging.info("d0: %.2f", d0)
         if not DEBUG:
@@ -133,13 +132,13 @@ def handle_smartmeter_message(client, _, msg):
             logging.debug("d1: %.2f", d1)
             # if there has been a retained value, use it as offset from now on
             d1 += d1_retained if d1_retained else 0
-            logging.debug("d1: %.2f", d1)
             # tell/publish
             logging.info("d1: %.2f", d1)
             if not DEBUG:
                 client.publish("tele/smartmeter/total/d1", d1, retain=True)
-            # reset
-            d0_retained = 0
+
+        # reset
+        d0_retained = 0
 
 
 def handle_retained_dx_message(client, userdata, msg):
