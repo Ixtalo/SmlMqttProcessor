@@ -337,33 +337,47 @@ class TestMqtt:
         def connect_dummy(_, host, port=1883):
             print("CONNECT DUMMY", host, port)
 
-        def publish_dummy(_, topic, payload=None):
-            print(topic, payload)
+        def publish_dummy(_, topic, payload=None, retain=False):
+            print(topic, payload, retain)
             # we expect multiple messages, multiple topics
             assert topic.startswith('tele/smartmeter')
             # one check for each topic...
             if topic == 'tele/smartmeter/time/first':
                 assert payload == 111
+                assert not retain
             elif topic == 'tele/smartmeter/time/last':
                 assert payload == 333
+                assert not retain
+            elif topic == 'tele/smartmeter/time/value':
+                assert payload == 333
+                assert retain   # yes, retain this field!
             elif topic == 'tele/smartmeter/total/value':
                 assert payload == 3
+                assert retain   # yes, retain this field!
             elif topic == 'tele/smartmeter/total/first':
                 assert payload == 1
+                assert not retain
             elif topic == 'tele/smartmeter/total/last':
                 assert payload == 3
+                assert not retain
             elif topic == 'tele/smartmeter/actual/first':
                 assert payload == -11
+                assert not retain
             elif topic == 'tele/smartmeter/actual/last':
                 assert payload == 99
+                assert not retain
             elif topic == 'tele/smartmeter/actual/median':
                 assert payload == 16.5
+                assert not retain
             elif topic == 'tele/smartmeter/actual/mean':
                 assert payload == 22
+                assert not retain
             elif topic == 'tele/smartmeter/actual/min':
                 assert payload == -22
+                assert not retain
             elif topic == 'tele/smartmeter/actual/max':
                 assert payload == 99
+                assert not retain
 
         # monkey patching
         monkeypatch.setattr(stmp.mqtt.Client, "connect", connect_dummy)
@@ -402,7 +416,7 @@ class TestMqtt:
                                'min': -22.2,
                                'stdev': 43.3,
                                'value': 99.9},
-                    'time': {'first': 111.1, 'last': 333.3},
+                    'time': {'first': 111.1, 'last': 333.3, 'value': 333.3},
                     'total': {'first': 1.111,
                               'last': 3.333,
                               'value': 3.333}
@@ -419,15 +433,15 @@ class TestMqttSingleTopic:
         def connect_dummy(_, host, port=1883):
             print("CONNECT DUMMY", host, port)
 
-        def publish_dummy(_, topic, payload=None):
-            print(topic, payload)
+        def publish_dummy(_, topic, payload=None, retain=False):
+            print(topic, payload, retain)
             assert topic == 'tele/smartmeter'
             # everything as just one single topic, payload as JSON
             # use json.dumps to compare the two dictionaries
             # (NOTE: dictionary sorting varies between Python versions and platforms!)
             actual = json.loads(payload)
             expected = {
-                "time": {"first": 111.1, "last": 333.3},
+                "time": {"first": 111.1, "last": 333.3, "value": 333.3},
                 "actual": {
                     "first": -11.1,
                     "last": 99.9,
