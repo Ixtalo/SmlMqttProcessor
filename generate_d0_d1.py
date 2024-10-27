@@ -2,7 +2,13 @@
 # -*- coding: utf-8 -*-
 """generate_d0_d1.py - Process MQTT messages to produce today (d0) & yesterday (d1).
 
-The Python program listens to incoming MQTT messages from a smart meter, capturing real-time consumption data. It processes this data to compute the current consumption value for the day (d0) and the previous day (d1). These daily consumption metrics are then published back to a designated MQTT topic, allowing for continuous updates on today's and yesterday's power usage.
+The Python program listens to incoming MQTT messages from a 
+smart meter, capturing real-time consumption data. It processes 
+this data to compute the current consumption value for the 
+day (d0) and the previous day (d1). These daily consumption 
+metrics are then published back to a designated MQTT topic, 
+allowing for continuous updates on today's and yesterday's 
+power usage.
 
 Usage:
   generate_d0_d1.py
@@ -30,16 +36,108 @@ import configparser
 import logging
 import os
 import sys
-from datetime import datetime
+from pathlib import Path
+from datetime import datetime, timedelta
 
 import colorlog
 import paho.mqtt.client as mqtt
-import pandas as pd
+
+
+MQTT_TOPIC_SMARTMETER_TOTAL = "tele/smartmeter/total/value"
+MQTT_TOPIC_D0 = "tele/smartmeter/total/d0"
+MQTT_TOPIC_D1 = "tele/smartmeter/total/d1"
 
 
 LOGGING_STREAM = sys.stdout
 DEBUG = bool(os.getenv("DEBUG", "").lower() in ("1", "true", "yes"))
-__script_dir = os.path.dirname(os.path.realpath(__file__))
+__script_dir = Path(__file__).parent
+
+
+class EnergyMonitor:
+    d0_retained = None
+    d1_retained = None
+
+    def __init__(self, retain: bool = True):
+        self.retain = retain
+        self.data = []
+        self.d0 = None  # today
+        self.d1 = None  # yesterday
+
+    def add_value(self, total_value: float):
+        timestamp = datetime.now()
+        self.data.append({'timestamp': timestamp, 'value': total_value})
+        
+        # Tagesverbrauch (D_0) berechnen
+        delta = self.calculate_daily_consumption()
+        if not delta:
+            logging.debug("d0 delta: not enough data yet")
+        else:
+            logging.info("d0 delta: %.2f", delta)
+            self.d0 = delta
+            # if there has been a retained value, use it as offset from now on
+            self.d0 += self.d0_retained if self.d0_retained else 0
+            # tell/publish
+            logging.info("d0: %.2f", self.d0)
+            if not DEBUG:
+                client.publish(MQTT_TOPIC_D0, self.d0, retain=self.retain)
+
+        # Verbrauch des Vortags (D_-1) berechnen, wenn ein neuer Tag beginnt
+        if timestamp.hour == 0 and timestamp.minute == 0 and self.d0 is not None:
+            delta = self.calculate_yesterday_consumption()
+            if not delta:
+                logging.debug("d1 delta: not enough data yet")
+            else:
+                logging.info("d1 delta: %.2f", delta)
+                self.d1 = delta
+                # if there has been a retained value, use it as offset from now on
+                self.d1 += self.d1_retained if self.d1_retained else 0
+                # tell/publish
+                logging.info("d1: %.2f", self.d1)
+                if not DEBUG:
+                    client.publish(MQTT_TOPIC_D1, self.d1, retain=self.retain)
+            # reset on new day
+            self.d0_retained = 0
+
+    def calculate_daily_consumption(self):
+        today = datetime.now().date()
+        today_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == today]
+        # check if there are actually at least 2 values available (2 such messages)
+        if len(today_data) > 1:
+            return today_data[-1] - today_data[0]
+        return None
+
+    def calculate_yesterday_consumption(self):
+        yesterday = datetime.now().date() - timedelta(days=1)
+        yesterday_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == yesterday]
+        # check if there are actually at least 2 values available (2 days)
+        if len(yesterday_data) > 1:
+            return yesterday_data[-1] - yesterday_data[0]
+        return None
+
+
+def handle_smartmeter_message(client, userdata, msg):
+    value = float(msg.payload.decode())
+    userdata.add_value(value)
+
+
+def handle_retained_dx_message(client, userdata, msg):
+    """Handle the last retained message to use that as initial offset."""
+    logging.debug("handle_last_dx_message: %s = %s", msg.topic, msg.payload)
+    value = float(msg.payload.decode())
+    if msg.topic == MQTT_TOPIC_D0:
+        # store value to be used as initial offset
+        userdata.d0_retained = value
+        logging.info("d0 (retained): %.2f", userdata.d0_retained)
+        # no further handling of this topic is required
+        client.unsubscribe(msg.topic)
+    elif msg.topic == MQTT_TOPIC_D1:
+        # store value to be used as initial offset
+        userdata.d1_retained = value
+        logging.info("d1 (retained): %.2f", userdata.d1_retained)
+        # no further handling of this topic is required
+        client.unsubscribe(msg.topic)
+    else:
+        logging.warning("Unexpected message! (%s, %s)", msg.topic, msg.payload)
 
 
 def setup_logging(level: int = logging.INFO, log_file: str = None, no_color=False):
@@ -63,117 +161,48 @@ def setup_logging(level: int = logging.INFO, log_file: str = None, no_color=Fals
     logging.basicConfig(level=level, handlers=[handler])
 
 
+def get_config(configfile: Path):
+    config = configparser.ConfigParser()
+    if not configfile.is_absolute():
+        configfile = __script_dir.joinpath(configfile)
+    logging.info("Config file: %s", configfile.resolve())
+    if not configfile.is_file():
+        raise RuntimeError(f"No configfile! ({configfile.resolve()})")
+    if not os.access(configfile, os.R_OK):
+        raise RuntimeError(f"Configfile not readable! ({configfile.resolve()})")
+    res = config.read(configfile)
+    logging.debug("config read result: %s", res)
+    return config
+
+
+# set up logging framework
 setup_logging(level=logging.INFO if not DEBUG else logging.DEBUG)
 
-
-# Configuration
-config = configparser.ConfigParser()
-configfile = 'config.ini'
-if not os.path.isabs(configfile):
-    # if not an absolute path then make it one based on this very script's folder
-    arg_configfile = os.path.join(__script_dir, configfile)
-configfile = os.path.abspath(arg_configfile)
-logging.info("Config file: %s", arg_configfile)
-if not (os.path.isfile(arg_configfile) and os.access(arg_configfile, os.R_OK)):
-    logging.error('Config file is not a file or not accessible! Aborting.')
-    sys.exit(3)
-config.read(arg_configfile)
-
-
+# configuration
+config = get_config(Path('config.ini'))
 mqtt_username = config.get('Mqtt', 'username')
 mqtt_password = config.get('Mqtt', 'password')
 mqtt_host = config.get('Mqtt', 'host', fallback='localhost')
 mqtt_port = config.getint('Mqtt', 'port', fallback=1883)
+mqtt_retain = config.getboolean('Mqtt', 'retain', fallback='true')
 
-data = pd.DataFrame(columns=['timestamp', 'value'])
-d0_retained = None
-d1_retained = None
-
-#client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-client = mqtt.Client()
+# MQTT initialization
+client = mqtt.Client(userdata=EnergyMonitor(retain=mqtt_retain))
 client.username_pw_set(username=mqtt_username, password=mqtt_password)
 client.enable_logger()
 
-
-def handle_smartmeter_message(client, _, msg):
-    global data, d0_retained, d1_retained
-    logging.debug("handle_smartmeter_message: %s", msg.payload)
-
-    value = float(msg.payload.decode())
-    timestamp = datetime.now()
-    
-    # Neuen Eintrag in das DataFrame hinzufügen
-    new_row = pd.DataFrame({'timestamp': [timestamp], 'value': [value]})
-    data = pd.concat([data, new_row], ignore_index=True)
- 
-    # Tagesverbrauch (d_0) berechnen
-    data['date'] = data['timestamp'].dt.date
-    today = datetime.now().date()
-
-    # Verbrauch für den aktuellen Tag berechnen
-    today_data = data[data['date'] == today]
-    if len(today_data) > 1:
-        # value difference (delta) between today's last and first value
-        d0 = today_data['value'].iloc[-1] - today_data['value'].iloc[0]
-        logging.debug("d0: %.2f", d0)
-        # if there has been a retained value, use it as offset from now on
-        d0 += d0_retained if d0_retained else 0
-        # tell/publish
-        logging.info("d0: %.2f", d0)
-        if not DEBUG:
-            client.publish("tele/smartmeter/total/d0", d0, retain=True)
-
-    # Verbrauch des Vortags (d_-1) berechnen, wenn ein neuer Tag beginnt
-    if timestamp.hour == 0 and timestamp.minute == 0:
-        yesterday = today - pd.Timedelta(days=1)
-        yesterday_data = data[data['date'] == yesterday]
-        if len(yesterday_data) > 1:
-            d1 = yesterday_data['value'].iloc[-1] - yesterday_data['value'].iloc[0]
-            logging.debug("d1: %.2f", d1)
-            # if there has been a retained value, use it as offset from now on
-            d1 += d1_retained if d1_retained else 0
-            # tell/publish
-            logging.info("d1: %.2f", d1)
-            if not DEBUG:
-                client.publish("tele/smartmeter/total/d1", d1, retain=True)
-
-        # reset
-        d0_retained = 0
-
-
-def handle_retained_dx_message(client, userdata, msg):
-    """Handle the last retained message to use that as initial offset."""
-    global d0_retained, d1_retained
-    logging.debug("handle_last_dx_message: %s = %s", msg.topic, msg.payload)
-    value = float(msg.payload.decode())
-    if msg.topic == "tele/smartmeter/total/d0":
-        # store value to be used as initial offset
-        d0_retained = value
-        logging.info("d0 (retained): %.2f", d0_retained)
-        # no further handling of this topic is required
-        client.unsubscribe(msg.topic)
-    elif msg.topic == "tele/smartmeter/total/d1":
-        # store value to be used as initial offset
-        d1_retained = value
-        logging.info("d1 (retained): %.2f", d1_retained)
-        # no further handling of this topic is required
-        client.unsubscribe(msg.topic)
-    else:
-        logging.warning("Unexpected message! (%s, %s)", msg.topic, msg.payload)
-
-
-# define the message handlers
-client.message_callback_add("tele/smartmeter/total/d0", handle_retained_dx_message)
-client.message_callback_add("tele/smartmeter/total/d1", handle_retained_dx_message)
-client.message_callback_add("tele/smartmeter/total/value", handle_smartmeter_message)
+# MQTT message callbacks
+client.message_callback_add(MQTT_TOPIC_D0, handle_retained_dx_message)
+client.message_callback_add(MQTT_TOPIC_D1, handle_retained_dx_message)
+client.message_callback_add(MQTT_TOPIC_SMARTMETER_TOTAL, handle_smartmeter_message)
 
 # initialize MQTT connection
 client.connect(mqtt_host, port=mqtt_port)
 # NOTE subscriptions must come *after* connect() !
-# subscribe to our retained messages
-client.subscribe("tele/smartmeter/total/d0")
-client.subscribe("tele/smartmeter/total/d1")
-# subscribe to the very data source
-client.subscribe("tele/smartmeter/total/value")
+# subscribe to the retained messages
+client.subscribe(MQTT_TOPIC_D0)
+client.subscribe(MQTT_TOPIC_D1)
+# subscribe to the very topic which contains the source data
+client.subscribe(MQTT_TOPIC_SMARTMETER_TOTAL)
 
 client.loop_forever()
