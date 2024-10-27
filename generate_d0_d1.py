@@ -84,7 +84,7 @@ class EnergyMonitor:
             self.d0 += self.d0_retained if self.d0_retained else 0
             # tell/publish
             logging.info("d0: %.2f", self.d0)
-            self.__publish(MQTT_TOPIC_D0, self.d0)
+            self.__publish(client, MQTT_TOPIC_D0, self.d0)
 
         # Verbrauch des Vortags (D_-1) berechnen, wenn ein neuer Tag beginnt
         if timestamp.hour == 0 and timestamp.minute == 0 and self.d0 is not None:
@@ -98,7 +98,7 @@ class EnergyMonitor:
                 self.d1 += self.d1_retained if self.d1_retained else 0
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
-                self.__publish(MQTT_TOPIC_D1, self.d1)
+                self.__publish(client, MQTT_TOPIC_D1, self.d1)
             # reset on new day
             self.d0_retained = 0
 
