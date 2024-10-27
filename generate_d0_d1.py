@@ -123,9 +123,9 @@ def handle_smartmeter_message(client, userdata, msg):
     value = float(msg.payload.decode())
     userdata.add_value(value)
     if userdata.d0 and not DEBUG:
-        client.publish(MQTT_TOPIC_D0, round(value, 2), retain=userdata.retain)
+        client.publish(MQTT_TOPIC_D0, round(userdata.d0, 2), retain=userdata.retain)
     if userdata.d1 and not DEBUG:
-        client.publish(MQTT_TOPIC_D1, round(value, 2), retain=userdata.retain)
+        client.publish(MQTT_TOPIC_D1, round(userdata.d1, 2), retain=userdata.retain)
 
 
 def handle_retained_dx_message(client, userdata, msg):
