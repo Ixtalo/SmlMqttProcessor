@@ -72,13 +72,17 @@ class EnergyMonitor:
     def add_value(self, total_value: float):
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
+
+        if len(self.data) < 2:
+            logging.debug("d0 delta: not enough data yet")
+            return
         
         # calculate the difference (delta) aka consumption today so far (d_0)
         delta = self.calculate_daily_consumption()
         if not delta:
             logging.debug("d0 delta: not enough data yet")
         else:
-            logging.info("d0 delta: %.2f", delta)
+            logging.debug("d0 delta since start: %.2f", delta)
             self.d0 = delta
             # if there has been a retained value, use it as offset from now on
             self.d0 += self.d0_retained if self.d0_retained else 0
@@ -95,7 +99,7 @@ class EnergyMonitor:
             if not delta:
                 logging.debug("d1 delta: not enough data yet")
             else:
-                logging.info("d1 delta: %.2f", delta)
+                logging.debug("d1 delta since start: %.2f", delta)
                 self.d1 = delta
                 # if there has been a retained value, use it as offset from now on
                 self.d1 += self.d1_retained if self.d1_retained else 0
@@ -108,9 +112,7 @@ class EnergyMonitor:
         today = datetime.now().date()
         # slice data to just today's subset
         today_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == today]
-        # check if there are actually at least 2 values available (2 such messages)
         if len(today_data) > 1:
-            # difference between the last and the first value
             return today_data[-1] - today_data[0]
         return None
 
@@ -119,9 +121,7 @@ class EnergyMonitor:
         yesterday = datetime.now().date() - timedelta(days=1)
         # slice data to yesterday
         yesterday_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == yesterday]
-        # check if there are actually at least 2 values available
         if len(yesterday_data) > 1:
-            # difference between the last and the first value
             return yesterday_data[-1] - yesterday_data[0]
         return None
 
