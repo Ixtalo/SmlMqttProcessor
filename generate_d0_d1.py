@@ -63,6 +63,12 @@ class EnergyMonitor:
         self.d0 = None  # today
         self.d1 = None  # yesterday
 
+    def __publish(self, client, topic, value):
+        if DEBUG:
+            logging.warning("*** DEBUG *** do not actually MQTT publish")
+            return
+        client.publish(topic, round(value, 2), retain=self.retain)
+
     def add_value(self, total_value: float):
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
@@ -78,8 +84,7 @@ class EnergyMonitor:
             self.d0 += self.d0_retained if self.d0_retained else 0
             # tell/publish
             logging.info("d0: %.2f", self.d0)
-            if not DEBUG:
-                client.publish(MQTT_TOPIC_D0, self.d0, retain=self.retain)
+            self.__publish(MQTT_TOPIC_D0, self.d0)
 
         # Verbrauch des Vortags (D_-1) berechnen, wenn ein neuer Tag beginnt
         if timestamp.hour == 0 and timestamp.minute == 0 and self.d0 is not None:
@@ -93,8 +98,7 @@ class EnergyMonitor:
                 self.d1 += self.d1_retained if self.d1_retained else 0
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
-                if not DEBUG:
-                    client.publish(MQTT_TOPIC_D1, self.d1, retain=self.retain)
+                self.__publish(MQTT_TOPIC_D1, self.d1)
             # reset on new day
             self.d0_retained = 0
 
