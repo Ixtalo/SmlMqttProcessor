@@ -73,7 +73,7 @@ class EnergyMonitor:
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
         
-        # Tagesverbrauch (D_0) berechnen
+        # calculate the difference (delta) aka consumption today so far (d_0)
         delta = self.calculate_daily_consumption()
         if not delta:
             logging.debug("d0 delta: not enough data yet")
@@ -86,8 +86,11 @@ class EnergyMonitor:
             logging.info("d0: %.2f", self.d0)
             self.__publish(client, MQTT_TOPIC_D0, self.d0)
 
-        # Verbrauch des Vortags (D_-1) berechnen, wenn ein neuer Tag beginnt
+        # check if there's a new day
         if timestamp.hour == 0 and timestamp.minute == 0 and self.d0 is not None:
+            # reset on new day
+            self.d0_retained = 0
+            # calculate the difference (delta) aka consumption of yesterday (d_-1)
             delta = self.calculate_yesterday_consumption()
             if not delta:
                 logging.debug("d1 delta: not enough data yet")
@@ -99,33 +102,38 @@ class EnergyMonitor:
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
                 self.__publish(client, MQTT_TOPIC_D1, self.d1)
-            # reset on new day
-            self.d0_retained = 0
 
     def calculate_daily_consumption(self):
+        """Calculate the consumption of today (d_0)."""
         today = datetime.now().date()
+        # slice data to just today's subset
         today_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == today]
         # check if there are actually at least 2 values available (2 such messages)
         if len(today_data) > 1:
+            # difference between the last and the first value
             return today_data[-1] - today_data[0]
         return None
 
     def calculate_yesterday_consumption(self):
+        """Calculate the consumption of yesterday (d_-1)."""
         yesterday = datetime.now().date() - timedelta(days=1)
+        # slice data to yesterday
         yesterday_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == yesterday]
-        # check if there are actually at least 2 values available (2 days)
+        # check if there are actually at least 2 values available
         if len(yesterday_data) > 1:
+            # difference between the last and the first value
             return yesterday_data[-1] - yesterday_data[0]
         return None
 
 
 def handle_smartmeter_message(client, userdata, msg):
+    """Handle MQTT message for smartmeter total values."""
     value = float(msg.payload.decode())
     userdata.add_value(value)
 
 
 def handle_retained_dx_message(client, userdata, msg):
-    """Handle the last retained message to use that as initial offset."""
+    """Handle MQTT retained messages to use as initial offsets."""
     logging.debug("handle_last_dx_message: %s = %s", msg.topic, msg.payload)
     value = float(msg.payload.decode())
     if msg.topic == MQTT_TOPIC_D0:
@@ -166,6 +174,7 @@ def setup_logging(level: int = logging.INFO, log_file: str = None, no_color=Fals
 
 
 def get_config(configfile: Path):
+    """Read configuration from confile file."""
     config = configparser.ConfigParser()
     if not configfile.is_absolute():
         configfile = __script_dir.joinpath(configfile)
