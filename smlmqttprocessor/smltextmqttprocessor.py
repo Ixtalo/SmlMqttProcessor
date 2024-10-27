@@ -29,7 +29,7 @@ Options:
 #
 # LICENSE:
 #
-# Copyright (C) 2020-2023 Alexander Streicher
+# Copyright (C) 2020-2024 Ixtalo, ixtalo@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -64,9 +64,9 @@ import paho.mqtt.client as mqtt
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.15.0"
+__version__ = "1.16.0"
 __date__ = "2020-04-21"
-__updated__ = "2024-08-27"
+__updated__ = "2024-10-27"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -108,6 +108,7 @@ SML_HEADERS = ('1-0:96.50.1*1#', '129-129:199.130.3*255#')
 ##
 ########################################################################
 
+# Python 3.5 is the version of my Raspian 8 (Jessie) which has Python 3.5
 # f-string does not work with Python 3.5
 # pylint: disable=consider-using-f-string
 
@@ -174,11 +175,12 @@ class MyMqtt:
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
 
+        host = self.config.get('Mqtt', 'host', fallback='localhost')
+        port = self.config.getint('Mqtt', 'port', fallback=1883)
+
         # try-to-connect loop
         client.connected = False
         wait_time = 1
-        host = self.config.get('Mqtt', 'host', fallback='localhost')
-        port = self.config.getint('Mqtt', 'port', fallback=1883)
         while not self.connected:
             try:
                 client.connect(host, port=port)
@@ -215,16 +217,18 @@ class MyMqtt:
         # special handling for time field
         if 'time' in field2values:
             result['time'] = {}
+            result['time']['value'] = field2values['time'][-1]
             result['time']['first'] = field2values['time'][0]
             result['time']['last'] = field2values['time'][-1]
         for name, values in field2values.items():
             if name == 'time':
-                # do not output math statistics such as below for time field
+                # do not output math statistics (mean, stdev etc.) for the time field
                 continue
             if not values:
                 # could be empty, e.g. if no such data has been observed
                 continue
             if name == "total":
+                # special handling for the "total" field (no math stats)
                 result[name] = {}
                 result[name]['value'] = values[-1]
                 result[name]['first'] = values[0]
@@ -252,19 +256,33 @@ class MyMqtt:
 
         topic_prefix = self.config.get('Mqtt', 'topic_prefix', fallback='tele/smartmeter')
         single = self.config.getboolean('Mqtt', 'single_topic', fallback='false')
+        retain = self.config.getboolean('Mqtt', 'retain', fallback='false')
 
         # construct 2-dim dictionary fieldname --> value-type --> value
         mqttdata = self.construct_mqttdata(field2values)
 
         if single:
             # single-topic sending, i.e. everything as one single topic and JSON payload
-            self.client.publish(topic_prefix, json.dumps(mqttdata))
+            self.client.publish(topic_prefix, json.dumps(mqttdata), retain=retain)
         else:
             # multi-topic sending, i.e. each data entry as one unique topic, multiple messages
             for name, subname_value in mqttdata.items():
+                # name = e.g. total / actual
+                # subname_value = dict e.g. {"first": 123) / {"mean": 56.5} / ...
                 for subname, value in subname_value.items():
+                    # name = e.g. total / actual
+                    # subname = e.g. value / min / max / first / last / ...
+
+                    # by default do not set the MQTT retain flag but only for specific fields
+                    myretain = False
+                    if retain and name in ('total', 'time') and subname == 'value':
+                        # only retain for .../total/value and .../time/value
+                        myretain = True
+
+                    # construct topic, e.g., 'tele/smartmeter/time/value'
                     topic = "%s/%s/%s" % (topic_prefix, name, subname)
-                    self.client.publish(topic, value)
+                    # MQTT publish
+                    self.client.publish(topic, value, retain=myretain)
 
 
 def convert_messages2records(messages):
