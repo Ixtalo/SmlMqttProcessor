@@ -62,6 +62,7 @@ class EnergyMonitor:
         self.data = []
         self.d0 = None  # today
         self.d1 = None  # yesterday
+        self.current_date = datetime.now().date()  # start date
 
     def add_value(self, total_value: float):
         timestamp = datetime.now()
@@ -84,9 +85,10 @@ class EnergyMonitor:
             logging.info("d0: %.2f", self.d0)
 
         # check if there's a new day
-        if timestamp.hour == 0 and timestamp.minute == 0 and self.d0 is not None:
+        if timestamp.date() != self.current_date:
             # reset on new day
             self.d0_retained = 0
+            self.current_date = timestamp.date()
             # calculate the difference (delta) aka consumption of yesterday (d_-1)
             delta = self.calculate_yesterday_consumption()
             if not delta:
