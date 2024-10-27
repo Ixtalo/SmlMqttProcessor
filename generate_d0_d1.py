@@ -63,12 +63,6 @@ class EnergyMonitor:
         self.d0 = None  # today
         self.d1 = None  # yesterday
 
-    def __publish(self, client, topic, value):
-        if DEBUG:
-            logging.warning("*** DEBUG *** do not actually MQTT publish")
-            return
-        client.publish(topic, round(value, 2), retain=self.retain)
-
     def add_value(self, total_value: float):
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
@@ -88,7 +82,6 @@ class EnergyMonitor:
             self.d0 += self.d0_retained if self.d0_retained else 0
             # tell/publish
             logging.info("d0: %.2f", self.d0)
-            self.__publish(client, MQTT_TOPIC_D0, self.d0)
 
         # check if there's a new day
         if timestamp.hour == 0 and timestamp.minute == 0 and self.d0 is not None:
@@ -105,7 +98,6 @@ class EnergyMonitor:
                 self.d1 += self.d1_retained if self.d1_retained else 0
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
-                self.__publish(client, MQTT_TOPIC_D1, self.d1)
 
     def calculate_daily_consumption(self):
         """Calculate the consumption of today (d_0)."""
@@ -130,6 +122,10 @@ def handle_smartmeter_message(client, userdata, msg):
     """Handle MQTT message for smartmeter total values."""
     value = float(msg.payload.decode())
     userdata.add_value(value)
+    if userdata.d0 and not DEBUG:
+        client.publish(MQTT_TOPIC_D0, round(value, 2), retain=userdata.retain)
+    if userdata.d1 and not DEBUG:
+        client.publish(MQTT_TOPIC_D1, round(value, 2), retain=userdata.retain)
 
 
 def handle_retained_dx_message(client, userdata, msg):
