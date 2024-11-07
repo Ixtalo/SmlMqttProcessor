@@ -68,10 +68,6 @@ class EnergyMonitor:
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
 
-        if len(self.data) < 2:
-            logging.debug("d0 delta: not enough data yet")
-            return
-        
         # calculate the difference (delta) aka consumption today so far (d_0)
         delta = self.calculate_daily_consumption()
         if not delta:
