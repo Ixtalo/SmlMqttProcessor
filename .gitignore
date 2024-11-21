@@ -1,5 +1,4 @@
 config.ini
-config.local.ini
 venv/
 .?venv/
 
