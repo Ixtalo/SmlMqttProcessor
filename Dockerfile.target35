@@ -1,0 +1,40 @@
+#
+# "DevContainer"
+# podman build -t smpdev -f Dockerfile.target35 .
+#
+
+# Python 3.5 because my target platform is a RaspiZero with an old Python 3.5
+FROM python:3.5-slim
+
+# -----------------------------------------------
+# NOTE
+#
+# Python 3.5 needs Poetry < 1.2 (1.15.1) and that
+# does not support the newer pyproject.toml syntax!
+#
+# => do not use Poetry here
+#
+# -----------------------------------------------
+
+# install general system requirements
+#ENV DEBIAN_FRONTEND=noninteractive
+#RUN apt update \
+#    && apt install -y curl ca-certificates \
+#    # some Python libs need that
+#    build-essential libffi-dev
+#    # keep it # && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN python -m venv .venv \
+    && . .venv/bin/activate \
+    && which python \
+    && which pip \
+    && pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --upgrade pip \
+    && pip install \
+        --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org \
+        docopt paho-mqtt pysml typing colorlog \
+    && pip list
+
+# install our app
+COPY . /app/

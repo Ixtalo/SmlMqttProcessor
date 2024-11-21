@@ -1,5 +1,5 @@
-.?venv/
-.pytest_cache/
+venv/
+.venv/
 
 attic/
 doc/
@@ -13,11 +13,9 @@ config.ini
 config.local.ini
 coverage.xml
 
+Dockerfile*
 
-**/.git
-**/.gitignore
 **/.git*
-**/.github
 **/.idea
 **/.project
 **/__pycache__
