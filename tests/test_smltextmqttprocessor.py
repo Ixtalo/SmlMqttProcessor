@@ -1,10 +1,15 @@
 #!pytest
 # -*- coding: utf-8 -*-
 """Unit tests for smltextmqttprocessor.py, using pytest."""
+import sys
+import types
+from pathlib import Path
 
+import docopt
 import pytest
 
 import smlmqttprocessor.smltextmqttprocessor as stmp
+from smlmqttprocessor.smltextmqttprocessor import main
 
 
 # f-string does not work with Python 3.5
@@ -64,3 +69,137 @@ class TestLibsmlParsing:
 
     def test_check_stream_packet_begin_noheader(self):
         assert not stmp.check_stream_packet_begin('foobar')
+
+
+class TestMain:
+
+    @staticmethod
+    def test_noargs(monkeypatch):
+        monkeypatch.setattr(sys, "argv", ["_"])
+        with pytest.raises(docopt.DocoptExit):
+            main()
+
+    @staticmethod
+    def test_noinputfile(monkeypatch):
+        monkeypatch.setattr(sys, "argv", ["_", "doesnotexistfile"])
+        with pytest.raises(FileNotFoundError):
+            main()
+
+    @staticmethod
+    def test_testdataIskra(monkeypatch, capsys):
+        testdata_filepath = Path(__file__).parent.parent.joinpath("tests/testdata/ISKRA_MT175_eHZ.txt")
+        monkeypatch.setattr(sys, "argv",
+                            [
+                                "_",
+                                "--no-mqtt",
+                                "--timeout=1",
+                                "--window=5",
+                                str(testdata_filepath.resolve())
+                            ])
+        # action
+        main()
+        # check
+        stdout, stderr = capsys.readouterr()
+        assert stderr == ""
+        assert stdout == ('mqttdata:\n'
+                          "{'actual': {'first': 168,\n"
+                          "            'last': 168,\n"
+                          "            'max': 173,\n"
+                          "            'mean': 169.6,\n"
+                          "            'median': 168,\n"
+                          "            'min': 168,\n"
+                          "            'stdev': 2.3,\n"
+                          "            'value': 168},\n"
+                          " 'actual_l1': {'first': 117,\n"
+                          "               'last': 117,\n"
+                          "               'max': 119,\n"
+                          "               'mean': 117.6,\n"
+                          "               'median': 117,\n"
+                          "               'min': 117,\n"
+                          "               'stdev': 0.9,\n"
+                          "               'value': 117},\n"
+                          " 'actual_l2': {'first': 22,\n"
+                          "               'last': 22,\n"
+                          "               'max': 22,\n"
+                          "               'mean': 21.8,\n"
+                          "               'median': 22,\n"
+                          "               'min': 21,\n"
+                          "               'stdev': 0.4,\n"
+                          "               'value': 22},\n"
+                          " 'actual_l3': {'first': 29,\n"
+                          "               'last': 28,\n"
+                          "               'max': 32,\n"
+                          "               'mean': 29.4,\n"
+                          "               'median': 29,\n"
+                          "               'min': 28,\n"
+                          "               'stdev': 1.5,\n"
+                          "               'value': 28},\n"
+                          " 'time': {'first': 128972252, 'last': 128972260, 'value': 128972260},\n"
+                          " 'total': {'first': 22462413.6, 'last': 22462414.0, 'value': 22462414.0},\n"
+                          " 'total_tariff1': {'first': 22462413.6,\n"
+                          "                   'last': 22462414.0,\n"
+                          "                   'max': 22462414.0,\n"
+                          "                   'mean': 22462413.8,\n"
+                          "                   'median': 22462413.8,\n"
+                          "                   'min': 22462413.6,\n"
+                          "                   'stdev': 0.2,\n"
+                          "                   'value': 22462414.0},\n"
+                          " 'total_tariff2': {'first': 0.0,\n"
+                          "                   'last': 0.0,\n"
+                          "                   'max': 0.0,\n"
+                          "                   'mean': 0.0,\n"
+                          "                   'median': 0.0,\n"
+                          "                   'min': 0.0,\n"
+                          "                   'stdev': 0.0,\n"
+                          "                   'value': 0.0}}\n"
+                          'mqttdata:\n'
+                          "{'actual': {'first': 170,\n"
+                          "            'last': 169,\n"
+                          "            'max': 171,\n"
+                          "            'mean': 170.2,\n"
+                          "            'median': 170,\n"
+                          "            'min': 169,\n"
+                          "            'stdev': 0.8,\n"
+                          "            'value': 169},\n"
+                          " 'actual_l1': {'first': 117,\n"
+                          "               'last': 118,\n"
+                          "               'max': 119,\n"
+                          "               'mean': 118.2,\n"
+                          "               'median': 118,\n"
+                          "               'min': 117,\n"
+                          "               'stdev': 0.8,\n"
+                          "               'value': 118},\n"
+                          " 'actual_l2': {'first': 23,\n"
+                          "               'last': 22,\n"
+                          "               'max': 23,\n"
+                          "               'mean': 22.2,\n"
+                          "               'median': 22,\n"
+                          "               'min': 21,\n"
+                          "               'stdev': 0.8,\n"
+                          "               'value': 22},\n"
+                          " 'actual_l3': {'first': 29,\n"
+                          "               'last': 28,\n"
+                          "               'max': 30,\n"
+                          "               'mean': 29,\n"
+                          "               'median': 29,\n"
+                          "               'min': 28,\n"
+                          "               'stdev': 0.7,\n"
+                          "               'value': 28},\n"
+                          " 'time': {'first': 128972262, 'last': 128972270, 'value': 128972270},\n"
+                          " 'total': {'first': 22462414.1, 'last': 22462414.5, 'value': 22462414.5},\n"
+                          " 'total_tariff1': {'first': 22462414.1,\n"
+                          "                   'last': 22462414.5,\n"
+                          "                   'max': 22462414.5,\n"
+                          "                   'mean': 22462414.3,\n"
+                          "                   'median': 22462414.3,\n"
+                          "                   'min': 22462414.1,\n"
+                          "                   'stdev': 0.2,\n"
+                          "                   'value': 22462414.5},\n"
+                          " 'total_tariff2': {'first': 0.0,\n"
+                          "                   'last': 0.0,\n"
+                          "                   'max': 0.0,\n"
+                          "                   'mean': 0.0,\n"
+                          "                   'median': 0.0,\n"
+                          "                   'min': 0.0,\n"
+                          "                   'stdev': 0.0,\n"
+                          "                   'value': 0.0}}\n")

@@ -21,7 +21,9 @@ Options:
   --config <file> Configuration file [default: config.local.ini]
   --no-mqtt       Do not send over MQTT (mainly for testing).
   -q --quiet      Be quiet, show only errors.
+  -t --timeout=N  Timeout in seconds [default: 0].
   -v --verbose    Verbose output (logging.INFO).
+  -w --window=N   Window size.
   -h --help       Show this screen.
   --version       Show version.
 """
@@ -267,6 +269,8 @@ def main():
     arg_verbose = arguments['--verbose']
     arg_quiet = arguments['--quiet']
     arg_no_mqtt = arguments['--no-mqtt']
+    arg_timeout = int(arguments['--timeout'])
+    arg_window_size = arguments['--window']
 
     log_level = logging.WARNING
     if arg_verbose:
@@ -310,6 +314,9 @@ def main():
 
     # rolling window period
     window_size = config.getint(configparser.DEFAULTSECT, 'block_size', fallback=30)
+    if arg_window_size:
+        # overwrite by CLI
+        window_size = int(arg_window_size)
     logging.info('Aggregation/rolling window size: %d', window_size)
 
     # input stream
@@ -332,24 +339,10 @@ def main():
 
     # main processing loop on input stream
     # IF (size of rolling window is reached) THEN call handler function mqtt_or_println
-    processing_loop(istream, window_size, mqtt_or_println, deltas=deltas)
+    processing_loop(istream, window_size, mqtt_or_println, deltas=deltas, timeout=arg_timeout)
 
     return 0
 
 
 if __name__ == '__main__':
-    if DEBUG:
-        sys.argv.append('--verbose')
-    if os.environ.get("PROFILE", "").lower() in ("true", "1", "yes"):
-        # pylint: disable-next=ungrouped-imports
-        from time import strftime
-        import cProfile
-        import pstats
-        profile_filename = "%s_%s" % (__file__, strftime('%Y-%m-%d_%H%M%S')).profile
-        cProfile.run('main()', profile_filename)
-        with open("%s.txt" % profile_filename, "w", encoding="utf8") as statsfp:
-            profile_stats = pstats.Stats(profile_filename, stream=statsfp)
-            stats = profile_stats.strip_dirs().sort_stats('cumulative')
-            stats.print_stats()
-        sys.exit(0)
     sys.exit(main())

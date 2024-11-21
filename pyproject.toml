@@ -50,7 +50,7 @@ testpaths = ["tests",]
 
 ## https://coverage.readthedocs.io/en/latest/source.html#source
 [tool.coverage.run]
-omit = ["tests/*", "__init__.py"]
+omit = ["tests/*", "__init__.py", "main.py", "__main__.py"]
 
 ## https://github.com/hhatto/autopep8?tab=readme-ov-file#configuration
 [tool.autopep8]

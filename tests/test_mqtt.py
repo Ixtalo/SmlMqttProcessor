@@ -1,13 +1,40 @@
 import json
+import time
 from configparser import ConfigParser
 
 import smlmqttprocessor.mqtt as mqtt
+from smlmqttprocessor.mqtt import MyMqtt
 
 
 class TestMqtt:
     """Tests for "sending" of data via (virtual/mocked) MQTT."""
 
-    def test_send(self, monkeypatch):
+    @staticmethod
+    def test_constructor():
+        config = ConfigParser()
+        # action
+        actual = MyMqtt(config)
+        # check
+        assert not actual.client
+        assert actual.config == config
+        assert not actual.connected
+
+    @staticmethod
+    def test_connect(monkeypatch, caplog):
+        # mock the MQTT client to not do the actual MQTT publishing
+        monkeypatch.setattr(mqtt.mqtt_client.Client, "connect", lambda *_, **__: None)
+        monkeypatch.setattr(mqtt.mqtt_client.Client, "loop_start", lambda *_, **__: None)
+
+        config = ConfigParser()
+        instance = MyMqtt(config)
+
+        # action
+        instance.connect()
+        # check
+        assert len(caplog.messages) == 0
+
+    @staticmethod
+    def test_send(monkeypatch):
 
         def connect_dummy(_, host, port=1883):
             print("CONNECT DUMMY", host, port)
@@ -72,7 +99,8 @@ class TestMqtt:
         mymqtt.client = mqtt.mqtt_client.Client()
         mymqtt.send(data)
 
-    def test_construct_data(self):
+    @staticmethod
+    def test_construct_data():
         data = {
             'total': [1.111, 2.222, 3.333],
             'actual': [-11.1, -22.2, 11.1, 22.2, 33.3, 99.9],
@@ -104,7 +132,8 @@ class TestMqttSingleTopic:
     (Instead of multiple MQTT messages just send one JSON formatted message.)
     """
 
-    def test_send(self, monkeypatch):
+    @staticmethod
+    def test_send(monkeypatch):
         def connect_dummy(_, host, port=1883):
             print("CONNECT DUMMY", host, port)
 
@@ -148,6 +177,57 @@ class TestMqttSingleTopic:
         config = ConfigParser()
         config.add_section('Mqtt')
         config.set('Mqtt', 'single_topic', 'true')
+
+        # run / test
+        mymqtt = mqtt.MyMqtt(config)
+        mymqtt.connected = True
+        mymqtt.client = mqtt.mqtt_client.Client()
+        mymqtt.send(data)
+
+
+class TestMqttMultiTopic:
+    """Tests for "sending" of data via (mocked) MQTT as multiple MQTT messages"""
+
+    publish_i = 0
+
+    @staticmethod
+    def test_send(monkeypatch):
+        def connect_dummy(_, host, port=1883):
+            print("CONNECT DUMMY", host, port)
+
+        def publish_dummy(_, topic, payload=None, retain=False):
+            print(TestMqttMultiTopic.publish_i, topic, payload, retain)
+            if TestMqttMultiTopic.publish_i == 0:
+                assert topic == 'tele/smartmeter/time/value'
+                assert payload == 333.3
+            elif TestMqttMultiTopic.publish_i == 1:
+                assert topic == 'tele/smartmeter/time/first'
+                assert payload == 111.1
+            elif TestMqttMultiTopic.publish_i == 2:
+                assert topic == 'tele/smartmeter/time/last'
+                assert payload == 333.3
+            elif TestMqttMultiTopic.publish_i == 3:
+                assert topic == 'tele/smartmeter/total/value'
+                assert payload == 3.333
+            # ...
+            elif TestMqttMultiTopic.publish_i == 13:
+                assert topic == 'tele/smartmeter/actual/stdev'
+                assert payload == 43.3
+            TestMqttMultiTopic.publish_i += 1
+
+        # mock the MQTT client to not do the actual MQTT publishing
+        monkeypatch.setattr(mqtt.mqtt_client.Client, "connect", connect_dummy)
+        monkeypatch.setattr(mqtt.mqtt_client.Client, "publish", publish_dummy)
+
+        # test data
+        data = {
+            'total': [1.111, 2.222, 3.333],
+            'actual': [-11.1, -22.2, 11.1, 22.2, 33.3, 99.9],
+            'time': [111.1, 222.2, 333.3]
+        }
+        config = ConfigParser()
+        config.add_section('Mqtt')
+        config.set('Mqtt', 'single_topic', 'false')
 
         # run / test
         mymqtt = mqtt.MyMqtt(config)
