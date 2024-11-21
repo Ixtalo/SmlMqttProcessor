@@ -57,7 +57,6 @@ class MyMqtt:
         port = self.config.getint('Mqtt', 'port', fallback=1883)
 
         # try-to-connect loop
-        client.connected = False
         wait_time = 1
         while not self.connected:
             try:
@@ -101,7 +100,7 @@ class MyMqtt:
             result['time']['last'] = field2values['time'][-1]
         for name, values in field2values.items():
             if name == 'time':
-                # do not output math statistics (mean, stdev etc.) for the time field
+                # do not output math statistics (mean, stddev etc.) for the time field
                 continue
             if not values:
                 # could be empty, e.g. if no such data has been observed
