@@ -116,11 +116,6 @@ DEBUG = 0
 PROFILE = 0
 __SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-# check for Python3
-if sys.version_info < (3, 5):
-    sys.stderr.write("Minimum required version is Python 3.5!\n")
-    sys.exit(1)
-
 
 class ExitCodes(IntEnum):
     """Exit/return codes."""
