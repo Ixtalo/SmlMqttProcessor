@@ -3,11 +3,12 @@
 """Utility functions for logging."""
 import logging
 import sys
+from os import PathLike
 
 import colorlog
 
 
-def setup_logging(log_file: str = None, level: int = logging.INFO, color=True):
+def setup_logging(level: int = logging.INFO, log_file: PathLike = None, color=True):
     """Set up the logging framework."""
     # logging.basicConfig(level=logging.WARNING if not DEBUG else logging.DEBUG,
     #                    stream=LOGGING_STREAM,
