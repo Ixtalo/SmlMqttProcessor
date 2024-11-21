@@ -10,7 +10,7 @@ sml_server_time/
 htmlcov/
 
 config.ini
-config.local.ini
+config.dev.ini
 coverage.xml
 
 Dockerfile*
