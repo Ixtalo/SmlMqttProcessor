@@ -39,9 +39,9 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
-import colorlog
 import paho.mqtt.client as mqtt
 
+from smlmqttprocessor.utils.mylogging import setup_logging
 
 MQTT_TOPIC_SMARTMETER_TOTAL = "tele/smartmeter/total/value"
 MQTT_TOPIC_D0 = "tele/smartmeter/total/d0"
@@ -144,27 +144,6 @@ def handle_retained_dx_message(client, userdata, msg):
         client.unsubscribe(msg.topic)
     else:
         logging.warning("Unexpected message! (%s, %s)", msg.topic, msg.payload)
-
-
-def setup_logging(level: int = logging.INFO, log_file: str = None, no_color=False):
-    """Set up the logging framework."""
-    # logging.basicConfig(level=logging.WARNING if not DEBUG else logging.DEBUG,
-    #                    stream=LOGGING_STREAM,
-    #                    format="%(asctime)s %(levelname)-8s %(message)s",
-    #                    datefmt="%Y-%m-%d %H:%M:%S")
-    if log_file:
-        # pylint: disable=consider-using-with
-        stream = open(log_file, "a", encoding="utf8")
-        no_color = True
-    else:
-        stream = LOGGING_STREAM
-    handler = colorlog.StreamHandler(stream=stream)
-    format_string = "%(log_color)s%(asctime)s %(levelname)-8s %(message)s"
-    formatter = colorlog.ColoredFormatter(format_string,
-                                          datefmt="%Y-%m-%d %H:%M:%S",
-                                          no_color=no_color)
-    handler.setFormatter(formatter)
-    logging.basicConfig(level=level, handlers=[handler])
 
 
 def get_config(configfile: Path):
