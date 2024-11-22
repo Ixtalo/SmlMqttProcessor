@@ -6,7 +6,6 @@ using pytest and libsml's sml_server_time.
 """
 
 import logging
-import os
 import shlex
 from pathlib import Path
 from subprocess import Popen, PIPE
@@ -31,6 +30,7 @@ logging.basicConfig(level=logging.DEBUG,
 
 # counter how often processfile() has been called
 counter_processfile = 0
+
 
 @pytest.fixture
 def testdata_files():
@@ -59,71 +59,43 @@ def __processfile(filepath, window_size):
     return counter_processfile
 
 
-def test_processing_loop_exampledatafiles_window1(testdata_files):
-    """
-    Test all *.bin files for window_size=1
-    """
-    # predefined, empirically
-    files2n = {
-        'EMH_eHZ-GW8E2A500AK2.bin': 16,
-        'EMH_eHZ-HW8E2AWL0EK2P.bin': 13,
-        'EMH_eHZ-IW8E2AWL0EK2P.bin': 12,
-        'ISKRA_MT175_eHZ.bin': 10,
-        'ISKRA_MT691_eHZ-MS2020.bin': 18
-    }
-    # make sure this test actually runs with all files
-    assert len(testdata_files) == 5
-    # action
-    for filepath in testdata_files:
-        print(filepath)
-        # action
-        actual = __processfile(filepath, window_size=1)
-        # check
-        expected = files2n[filepath.name]
-        assert actual == expected, "Number mismatch for %s" % filepath.resolve()
-
-
-def test_processing_loop_exampledatafiles_window2(testdata_files):
-    """
-    Test all *.bin files for window_size=2
-    """
-    files2n = {
-        'EMH_eHZ-GW8E2A500AK2.bin': 8,
-        'EMH_eHZ-HW8E2AWL0EK2P.bin': 7,
-        'EMH_eHZ-IW8E2AWL0EK2P.bin': 6,
-        'ISKRA_MT175_eHZ.bin': 5,
-        'ISKRA_MT691_eHZ-MS2020.bin': 9
-    }
-    # make sure this test actually runs with all files
-    assert len(testdata_files) == 5
-    # action
-    for filepath in testdata_files:
-        print(filepath)
-        # action
-        actual = __processfile(filepath, window_size=2)
-        # check
-        expected = files2n[filepath.name]
-        assert actual == expected, "Number mismatch for %s" % filepath.resolve()
-
-
-def test_processing_loop_exampledatafiles_window15(testdata_files):
+@pytest.mark.parametrize(
+    "input_value,expected_numbers",
+    [
+        (1, {
+            'EMH_eHZ-GW8E2A500AK2.bin': 16,
+            'EMH_eHZ-HW8E2AWL0EK2P.bin': 13,
+            'EMH_eHZ-IW8E2AWL0EK2P.bin': 12,
+            'ISKRA_MT175_eHZ.bin': 10,
+            'ISKRA_MT691_eHZ-MS2020.bin': 18
+        }),
+        (2, {
+            'EMH_eHZ-GW8E2A500AK2.bin': 8,
+            'EMH_eHZ-HW8E2AWL0EK2P.bin': 7,
+            'EMH_eHZ-IW8E2AWL0EK2P.bin': 6,
+            'ISKRA_MT175_eHZ.bin': 5,
+            'ISKRA_MT691_eHZ-MS2020.bin': 9
+        }),
+        (15, {
+            'EMH_eHZ-GW8E2A500AK2.bin': 2,
+            'EMH_eHZ-HW8E2AWL0EK2P.bin': 1,
+            'EMH_eHZ-IW8E2AWL0EK2P.bin': 1,
+            'ISKRA_MT175_eHZ.bin': 1,
+            'ISKRA_MT691_eHZ-MS2020.bin': 2
+        }),
+    ]
+)
+def test_processing_loop(testdata_files, input_value, expected_numbers):
     """
     Test all *.bin files for window_size=15
     """
-    files2n = {
-        'EMH_eHZ-GW8E2A500AK2.bin': 2,
-        'EMH_eHZ-HW8E2AWL0EK2P.bin': 1,
-        'EMH_eHZ-IW8E2AWL0EK2P.bin': 1,
-        'ISKRA_MT175_eHZ.bin': 1,
-        'ISKRA_MT691_eHZ-MS2020.bin': 2
-    }
     # make sure this test actually runs with all files
     assert len(testdata_files) == 5
     # action
     for filepath in testdata_files:
         print(filepath)
         # action
-        actual = __processfile(filepath, window_size=15)
+        actual = __processfile(filepath, window_size=input_value)
         # check
-        expected = files2n[filepath.name]
+        expected = expected_numbers[filepath.name]
         assert actual == expected, "Number mismatch for %s" % filepath.resolve()
