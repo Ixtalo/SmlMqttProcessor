@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""MQTT publishing."""
 import json
 import logging
 import statistics
@@ -158,6 +161,6 @@ class MyMqtt:
                         myretain = True
 
                     # construct topic, e.g., 'tele/smartmeter/time/value'
-                    topic = "%s/%s/%s" % (topic_prefix, name, subname)
+                    topic = "%s/%s/%s" % (topic_prefix, name, subname)  # pylint: disable=consider-using-f-string
                     # MQTT publish
                     self.client.publish(topic, value, retain=myretain)

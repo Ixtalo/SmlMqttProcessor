@@ -52,7 +52,6 @@ import sys
 import time
 # pylint: disable=redefined-builtin
 from codecs import open
-from enum import IntEnum
 from pathlib import Path
 from pprint import pprint
 
@@ -64,8 +63,8 @@ import sml  # noqa: F401
 from docopt import docopt
 
 from smlmqttprocessor.mqtt import MyMqtt
-from smlmqttprocessor.utils.mylogging import setup_logging
 from smlmqttprocessor.utils.message_utils import convert_messages2records
+from smlmqttprocessor.utils.mylogging import setup_logging
 
 __version__ = "1.17.0"
 __date__ = "2020-04-21"
@@ -75,7 +74,6 @@ __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
 __status__ = "Production"
 
-
 ########################################################################
 # Configure the following to suit your actual smart meter configuration
 #
@@ -84,19 +82,19 @@ __status__ = "Production"
 # dictionary: MQTT-topic --> OBIS-code
 # for OBIS codes see e.g. https://wiki.volkszaehler.org/software/obis
 SML_FIELDS = {
-    'total': '1-0:1.8.0*255',          # Zählerstand Bezug
+    'total': '1-0:1.8.0*255',  # Zählerstand Bezug
     'total_tariff1': '1-0:1.8.1*255',  # Zählerstand Bezug Tarif 1
     'total_tariff2': '1-0:1.8.2*255',  # Zählerstand Bezug Tarif 2
     'total_tariff3': '1-0:1.8.3*255',  # Zählerstand Bezug Tarif 3
     'total_tariff4': '1-0:1.8.4*255',  # Zählerstand Bezug Tarif 4
 
-    'total_export': '1-0:2.8.0*255',          # Zählerstand Lieferung
+    'total_export': '1-0:2.8.0*255',  # Zählerstand Lieferung
     'total_export_tariff1': '1-0:2.8.1*255',  # Zählerstand Lieferung Tarif 1
     'total_export_tariff2': '1-0:2.8.2*255',  # Zählerstand Lieferung Tarif 2
     'total_export_tariff3': '1-0:2.8.3*255',  # Zählerstand Lieferung Tarif 3
     'total_export_tariff4': '1-0:2.8.4*255',  # Zählerstand Lieferung Tarif 4
 
-    'actual': '1-0:16.7.0*255',     # Leistung (Momentan)
+    'actual': '1-0:16.7.0*255',  # Leistung (Momentan)
     'actual_l1': '1-0:36.7.0*255',  # Leistung L1 (Momentan)
     'actual_l2': '1-0:56.7.0*255',  # Leistung L2 (Momentan)
     'actual_l3': '1-0:76.7.0*255',  # Leistung L3 (Momentan)
@@ -117,8 +115,7 @@ SML_HEADERS = ('1-0:96.50.1*1#', '129-129:199.130.3*255#')
 # pylint: disable=consider-using-f-string
 
 DEBUG = bool(os.getenv("DEBUG", "").lower() in ("1", "true", "yes"))
-__script_dir = Path(__file__).parent.parent     # project root
-
+__script_dir = Path(__file__).parent.parent  # project root
 
 
 def check_stream_packet_begin(line):
@@ -207,7 +204,7 @@ def processing_loop(input_stream, window_size, callback, timeout=0, deltas=None)
                 logging.info("window (%d) filled, handling #%d messages...",
                              window_size, n_msgs)
                 callback(messages)  # handle all messages
-                messages = []       # start a new collection
+                messages = []  # start a new collection
             elif deltas and n_msgs >= 2:
                 # dynamic checking of all fields in message according to declared delta-thresholds
                 for field_name, delta_value in deltas.items():
@@ -232,7 +229,7 @@ def processing_loop(input_stream, window_size, callback, timeout=0, deltas=None)
                         logging.info("field '%s', delta: %d, above threshold (%d), handling...",
                                      field_name, delta, delta_value)
                         callback(messages)  # handle all messages
-                        messages = []       # start a new collection
+                        messages = []  # start a new collection
                         # stop delta stuff, i.e., only 1 handling when delta event happens
                         break
 
@@ -253,8 +250,6 @@ def processing_loop(input_stream, window_size, callback, timeout=0, deltas=None)
             logging.error("Invalid message '%s': %s", line, ex)
 
         time.sleep(0.01)
-
-
 
 
 def main():

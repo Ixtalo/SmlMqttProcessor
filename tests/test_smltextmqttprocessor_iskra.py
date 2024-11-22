@@ -12,7 +12,8 @@ import smlmqttprocessor.smltextmqttprocessor as stmp
 # pylint: disable=consider-using-f-string
 
 # do not complain about missing docstring for tests
-# pylint: disable=missing-function-docstring, line-too-long
+# pylint: disable=missing-function-docstring,  missing-class-docstring
+# pylint: disable=line-too-long, too-few-public-methods
 # noqa: D102
 
 

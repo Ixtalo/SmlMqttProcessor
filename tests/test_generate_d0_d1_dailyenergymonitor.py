@@ -15,7 +15,8 @@ from generate_d0_d1 import (
 
 
 # do not complain about missing docstring for tests
-# pylint: disable=missing-function-docstring, line-too-long
+# pylint: disable=missing-function-docstring,  missing-class-docstring
+# pylint: disable=line-too-long, too-few-public-methods
 # noqa: D102
 
 
@@ -66,8 +67,8 @@ class TestDailyEnergyMonitorAddValue:
         assert len(instance.data) == 1
         assert instance.d0 is None
         assert instance.d1 is None
-        assert caplog.text == ('DEBUG    root:generate_d0_d1.py:70 new size of data[] is 1\n'
-                               'DEBUG    root:generate_d0_d1.py:82 d0 delta: not enough data yet\n')
+        assert caplog.text == ('DEBUG    root:generate_d0_d1.py:74 new size of data[] is 1\n'
+                               'DEBUG    root:generate_d0_d1.py:86 d0 delta: not enough data yet\n')
 
     @staticmethod
     def test_retain(caplog):
@@ -100,7 +101,7 @@ class TestDailyEnergyMonitorAddValue:
         assert instance.d0_retained is None
         assert instance.d1_retained is None
         # now mock the new day
-        monkeypatch.setattr(DailyEnergyMonitor, "check_is_new_day", lambda _, __: True)
+        monkeypatch.setattr(DailyEnergyMonitor, "_check_is_new_day", lambda _, __: True)
         # also need to mock the calculation methods because mocking of datetime.now() did not work for me
         monkeypatch.setattr(DailyEnergyMonitor, "calculate_consumption_today", lambda _: 888)
         monkeypatch.setattr(DailyEnergyMonitor, "calculate_consumption_yesterday", lambda _: 1234)
@@ -110,23 +111,23 @@ class TestDailyEnergyMonitorAddValue:
         assert instance.d0_retained == 0  # this is being reset
         assert instance.d1 == 1234
         assert instance.d1_retained == 1234
-        assert caplog.text == ('DEBUG    root:generate_d0_d1.py:70 new size of data[] is 1\n'
-                               'DEBUG    root:generate_d0_d1.py:82 d0 delta: not enough data yet\n'
-                               'DEBUG    root:generate_d0_d1.py:70 new size of data[] is 2\n'
-                               'DEBUG    root:generate_d0_d1.py:75 d0 delta since start: 400.00\n'
-                               'INFO     root:generate_d0_d1.py:80 d0: 400.00\n'
-                               'DEBUG    root:generate_d0_d1.py:70 new size of data[] is 3\n'
-                               'DEBUG    root:generate_d0_d1.py:75 d0 delta since start: 888.00\n'
-                               'INFO     root:generate_d0_d1.py:80 d0: 888.00\n'
-                               'DEBUG    root:generate_d0_d1.py:94 d1 delta since start: 1234.00\n'
-                               'INFO     root:generate_d0_d1.py:100 d1: 1234.00\n')
+        assert caplog.text == ('DEBUG    root:generate_d0_d1.py:74 new size of data[] is 1\n'
+                               'DEBUG    root:generate_d0_d1.py:86 d0 delta: not enough data yet\n'
+                               'DEBUG    root:generate_d0_d1.py:74 new size of data[] is 2\n'
+                               'DEBUG    root:generate_d0_d1.py:79 d0 delta since start: 400.00\n'
+                               'INFO     root:generate_d0_d1.py:84 d0: 400.00\n'
+                               'DEBUG    root:generate_d0_d1.py:74 new size of data[] is 3\n'
+                               'DEBUG    root:generate_d0_d1.py:79 d0 delta since start: 888.00\n'
+                               'INFO     root:generate_d0_d1.py:84 d0: 888.00\n'
+                               'DEBUG    root:generate_d0_d1.py:98 d1 delta since start: 1234.00\n'
+                               'INFO     root:generate_d0_d1.py:104 d1: 1234.00\n')
 
     @staticmethod
     def test_yesterday_noyesterdaydata(monkeypatch):
         # action
         instance = DailyEnergyMonitor()
         # now mock the new day
-        monkeypatch.setattr(DailyEnergyMonitor, "check_is_new_day", lambda _, __: True)
+        monkeypatch.setattr(DailyEnergyMonitor, "_check_is_new_day", lambda _, __: True)
         # also need to mock the calculation methods because mocking of datetime.now() did not work for me
         monkeypatch.setattr(DailyEnergyMonitor, "calculate_consumption_today", lambda _: 888)
         # tell that there's no data for yesterday
@@ -196,7 +197,6 @@ class TestHandleSmartmeterMessage:
 
     @staticmethod
     def test_handle_smartmeter_message(monkeypatch):
-
         # ----------------------------------------------------
         # mocking part
         class MockClient:
@@ -211,6 +211,7 @@ class TestHandleSmartmeterMessage:
                 self.d0 = 100.1234
                 self.d1 = 200.5678
                 self.retain = True
+                self.last_value = None
 
             def add_value(self, value):
                 self.last_value = value
@@ -260,7 +261,7 @@ class TestHandleRetainedMessage:
             self.payload = payload
 
     @staticmethod
-    def test_d0(monkeypatch, caplog):
+    def test_d0(caplog):
         # prepare
         mock_client = TestHandleRetainedMessage.MockClient()
         mock_userdata = TestHandleRetainedMessage.MockUserdata()
@@ -275,7 +276,7 @@ class TestHandleRetainedMessage:
         assert "d0 (retained): 123.45" in caplog.text
 
     @staticmethod
-    def test_d1(monkeypatch, caplog):
+    def test_d1(caplog):
         # prepare
         mock_client = TestHandleRetainedMessage.MockClient()
         mock_userdata = TestHandleRetainedMessage.MockUserdata()
@@ -290,7 +291,7 @@ class TestHandleRetainedMessage:
         assert "d1 (retained): 456.78" in caplog.text
 
     @staticmethod
-    def test_unexpected_topic(monkeypatch, caplog):
+    def test_unexpected_topic(caplog):
         # prepare
         mock_client = TestHandleRetainedMessage.MockClient()
         mock_userdata = TestHandleRetainedMessage.MockUserdata()
@@ -301,7 +302,7 @@ class TestHandleRetainedMessage:
         # check
         assert mock_userdata.d0_retained is None
         assert mock_userdata.d1_retained is None
-        assert mock_client.unsubscribed_topics == []
+        assert not mock_client.unsubscribed_topics
         assert caplog.records[0].levelno == logging.WARNING
         assert caplog.records[0].message == "Unexpected message! (footopic, b'999.99')"
         assert len(caplog.records) == 1

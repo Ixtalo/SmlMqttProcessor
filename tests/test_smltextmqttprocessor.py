@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """Unit tests for smltextmqttprocessor.py, using pytest."""
 import sys
-import types
 from pathlib import Path
 
 import docopt
@@ -16,7 +15,8 @@ from smlmqttprocessor.smltextmqttprocessor import main
 # pylint: disable=consider-using-f-string
 
 # do not complain about missing docstring for tests
-# pylint: disable=missing-function-docstring, line-too-long
+# pylint: disable=missing-function-docstring,  missing-class-docstring
+# pylint: disable=line-too-long, too-few-public-methods
 # noqa: D102
 
 
@@ -86,8 +86,8 @@ class TestMain:
             main()
 
     @staticmethod
-    def test_testdataIskra(monkeypatch, capsys):
-        testdata_filepath = Path(__file__).parent.parent.joinpath("tests/testdata/ISKRA_MT175_eHZ.txt")
+    def test_testdata(monkeypatch, capsys):
+        testdata_filepath = Path(__file__).parent.joinpath("testdata/ISKRA_MT175_eHZ.txt")
         monkeypatch.setattr(sys, "argv",
                             [
                                 "_",

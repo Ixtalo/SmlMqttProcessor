@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Handling of message types."""
+
+
 def convert_messages2records(messages):
     """Convert a list of message-dictionaries to a dictionary with value-lists.
 

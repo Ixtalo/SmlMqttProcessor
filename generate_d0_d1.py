@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """generate_d0_d1.py - Process MQTT messages to produce today (d0) & yesterday (d1).
 
-The Python program listens to incoming MQTT messages from a 
-smart meter, capturing real-time consumption data. It processes 
-this data to compute the current consumption value for the 
-day (d0) and the previous day (d1). These daily consumption 
-metrics are then published back to a designated MQTT topic, 
-allowing for continuous updates on today's and yesterday's 
+The Python program listens to incoming MQTT messages from a
+smart meter, capturing real-time consumption data. It processes
+this data to compute the current consumption value for the
+day (d0) and the previous day (d1). These daily consumption
+metrics are then published back to a designated MQTT topic,
+allowing for continuous updates on today's and yesterday's
 power usage.
 
 Usage:
@@ -54,10 +54,13 @@ __script_dir = Path(__file__).parent
 
 
 class DailyEnergyMonitor:
+    """Calculate daily energy consumption for today & yesterday."""
+
     d0_retained = None
     d1_retained = None
 
     def __init__(self, retain: bool = True):
+        """Calculate daily energy consumption for today & yesterday."""
         self.retain = retain
         self.data = []
         self.d0 = None  # today
@@ -65,6 +68,7 @@ class DailyEnergyMonitor:
         self.current_date = datetime.now().date()  # start date
 
     def add_value(self, total_value: float):
+        """Add a new value to the internal data store."""
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
         logging.debug("new size of data[] is %s", len(self.data))
@@ -82,7 +86,7 @@ class DailyEnergyMonitor:
             logging.debug("d0 delta: not enough data yet")
 
         # check if there's a new day
-        if self.check_is_new_day(timestamp):
+        if self._check_is_new_day(timestamp):
             # reset on new day
             self.d0_retained = 0
             self.current_date = timestamp.date()
@@ -99,14 +103,15 @@ class DailyEnergyMonitor:
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
 
-    def check_is_new_day(self, timestamp: datetime):
+    def _check_is_new_day(self, timestamp: datetime):
         return timestamp.date() != self.current_date
 
     def calculate_consumption_today(self):
         """Calculate the consumption of today (d_0)."""
         today = datetime.now().date()
         # slice data to just today's subset
-        today_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == today]
+        today_data = [entry['value'] for entry in self.data
+                      if entry['timestamp'].date() == today]
         if len(today_data) > 1:
             return today_data[-1] - today_data[0]
         return None
@@ -115,7 +120,8 @@ class DailyEnergyMonitor:
         """Calculate the consumption of yesterday (d_-1)."""
         yesterday = datetime.now().date() - timedelta(days=1)
         # slice data to yesterday
-        yesterday_data = [entry['value'] for entry in self.data if entry['timestamp'].date() == yesterday]
+        yesterday_data = [entry['value'] for entry in self.data
+                          if entry['timestamp'].date() == yesterday]
         if len(yesterday_data) > 1:
             return yesterday_data[-1] - yesterday_data[0]
         return None
@@ -169,6 +175,7 @@ def get_config(configfile: Path):
 
 
 def main():
+    """Start the program's main entry point."""
     # set up logging framework
     setup_logging(level=logging.INFO if not DEBUG else logging.DEBUG)
 

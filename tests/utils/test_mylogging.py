@@ -5,6 +5,11 @@ import os
 
 from smlmqttprocessor.utils.mylogging import setup_logging
 
+# do not complain about missing docstring for tests
+# pylint: disable=missing-function-docstring,  missing-class-docstring
+# pylint: disable=line-too-long, too-few-public-methods
+# noqa: D102
+
 
 class TestSetupLoggingDefaults:
 
@@ -32,7 +37,7 @@ class TestSetupLoggingLevels:
         assert caplog.records[0].levelno == logging.INFO
         assert caplog.records[0].msg == "foo"
         # check formatting
-        assert caplog.text == 'INFO     root:test_mylogging.py:29 foo\n'
+        assert caplog.text == 'INFO     root:test_mylogging.py:34 foo\n'
         # check that colored logging is active
         assert 'ColoredLevelFormatter' in repr(caplog.handler.formatter)
         # check that nothing has been written to STDOUT/STDERR

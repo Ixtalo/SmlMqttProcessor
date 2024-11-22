@@ -12,7 +12,8 @@ import smlmqttprocessor.smltextmqttprocessor as stmp
 # pylint: disable=consider-using-f-string
 
 # do not complain about missing docstring for tests
-# pylint: disable=missing-function-docstring, line-too-long
+# pylint: disable=missing-function-docstring,  missing-class-docstring
+# pylint: disable=line-too-long, too-few-public-methods
 # noqa: D102
 
 
@@ -24,7 +25,7 @@ class TestLibsmlParsingEMH:
     @pytest.fixture(autouse=True)
     def run_around_tests(self):
         # before
-        self.istream = io.StringIO()
+        self.istream = io.StringIO()    # pylint: disable=attribute-defined-outside-init
         self.istream.write("""129-129:199.130.3*255#EMH#
             1-0:0.0.9*255#01 a8 15 98 64 80 02 01 02 #
             1-0:1.8.0*255#5378499.0#Wh

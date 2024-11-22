@@ -1,9 +1,16 @@
+#!pytest
+# -*- coding: utf-8 -*-
+"""Unit tests for own MQTT class."""
 import json
-import time
 from configparser import ConfigParser
 
 import smlmqttprocessor.mqtt as mqtt
 from smlmqttprocessor.mqtt import MyMqtt
+
+# do not complain about missing docstring for tests
+# pylint: disable=missing-function-docstring,  missing-class-docstring
+# pylint: disable=line-too-long, too-few-public-methods
+# noqa: D102
 
 
 class TestMqtt:
