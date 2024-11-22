@@ -9,7 +9,7 @@ license = "AGPL"
 [tool.poetry.dependencies]
 # pylint 3.2 requires Python >=3.6
 # pytest 7.3 required Python >=3.7
-python = ">=3.9,<4.0" 
+python = ">=3.9,<4.0"
 docopt = "*"
 paho-mqtt = "~=1.6"
 pysml = "~=0.1.2"
