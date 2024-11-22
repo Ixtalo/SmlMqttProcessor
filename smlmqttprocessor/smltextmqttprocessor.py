@@ -22,7 +22,7 @@ Options:
   --no-mqtt       Do not send over MQTT (mainly for testing).
   -q --quiet      Be quiet, show only errors.
   -t --timeout=N  Timeout in seconds [default: 0].
-  -v --verbose    Verbose output (logging.INFO).
+  -v --verbose    Verbose output (INFO level).
   -w --window=N   Window size.
   -h --help       Show this screen.
   --version       Show version.
