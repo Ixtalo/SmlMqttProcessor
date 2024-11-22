@@ -53,7 +53,7 @@ DEBUG = bool(os.getenv("DEBUG", "").lower() in ("1", "true", "yes"))
 __script_dir = Path(__file__).parent
 
 
-class EnergyMonitor:
+class DailyEnergyMonitor:
     d0_retained = None
     d1_retained = None
 
@@ -69,7 +69,7 @@ class EnergyMonitor:
         self.data.append({'timestamp': timestamp, 'value': total_value})
 
         # calculate the difference (delta) aka consumption today so far (d_0)
-        delta = self.calculate_daily_consumption()
+        delta = self.calculate_consumption_today()
         if not delta:
             logging.debug("d0 delta: not enough data yet")
         else:
@@ -86,7 +86,7 @@ class EnergyMonitor:
             self.d0_retained = 0
             self.current_date = timestamp.date()
             # calculate the difference (delta) aka consumption of yesterday (d_-1)
-            delta = self.calculate_yesterday_consumption()
+            delta = self.calculate_consumption_yesterday()
             if not delta:
                 logging.debug("d1 delta: not enough data yet")
             else:
@@ -97,7 +97,7 @@ class EnergyMonitor:
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
 
-    def calculate_daily_consumption(self):
+    def calculate_consumption_today(self):
         """Calculate the consumption of today (d_0)."""
         today = datetime.now().date()
         # slice data to just today's subset
@@ -106,7 +106,7 @@ class EnergyMonitor:
             return today_data[-1] - today_data[0]
         return None
 
-    def calculate_yesterday_consumption(self):
+    def calculate_consumption_yesterday(self):
         """Calculate the consumption of yesterday (d_-1)."""
         yesterday = datetime.now().date() - timedelta(days=1)
         # slice data to yesterday
@@ -174,7 +174,7 @@ def main():
     mqtt_retain = config.getboolean('Mqtt', 'retain', fallback='true')
 
     # MQTT initialization
-    client = mqtt.Client(userdata=EnergyMonitor(retain=mqtt_retain))
+    client = mqtt.Client(userdata=DailyEnergyMonitor(retain=mqtt_retain))
     client.username_pw_set(username=mqtt_username, password=mqtt_password)
     client.enable_logger()
 
