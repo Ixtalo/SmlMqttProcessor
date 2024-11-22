@@ -35,7 +35,6 @@ Usage:
 import configparser
 import logging
 import os
-import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -47,8 +46,9 @@ MQTT_TOPIC_SMARTMETER_TOTAL = "tele/smartmeter/total/value"
 MQTT_TOPIC_D0 = "tele/smartmeter/total/d0"
 MQTT_TOPIC_D1 = "tele/smartmeter/total/d1"
 
+CONFIG_FILENAME = "config.ini"
 
-LOGGING_STREAM = sys.stdout
+
 DEBUG = bool(os.getenv("DEBUG", "").lower() in ("1", "true", "yes"))
 __script_dir = Path(__file__).parent
 
@@ -67,21 +67,22 @@ class DailyEnergyMonitor:
     def add_value(self, total_value: float):
         timestamp = datetime.now()
         self.data.append({'timestamp': timestamp, 'value': total_value})
+        logging.debug("new size of data[] is %s", len(self.data))
 
         # calculate the difference (delta) aka consumption today so far (d_0)
         delta = self.calculate_consumption_today()
-        if not delta:
-            logging.debug("d0 delta: not enough data yet")
-        else:
+        if delta:
             logging.debug("d0 delta since start: %.2f", delta)
             self.d0 = delta
             # if there has been a retained value, use it as offset from now on
             self.d0 += self.d0_retained if self.d0_retained else 0
             # tell/publish
             logging.info("d0: %.2f", self.d0)
+        else:
+            logging.debug("d0 delta: not enough data yet")
 
         # check if there's a new day
-        if timestamp.date() != self.current_date:
+        if self.check_is_new_day(timestamp):
             # reset on new day
             self.d0_retained = 0
             self.current_date = timestamp.date()
@@ -94,8 +95,12 @@ class DailyEnergyMonitor:
                 self.d1 = delta
                 # if there has been a retained value, use it as offset from now on
                 self.d1 += self.d1_retained if self.d1_retained else 0
+                self.d1_retained = self.d1
                 # tell/publish
                 logging.info("d1: %.2f", self.d1)
+
+    def check_is_new_day(self, timestamp: datetime):
+        return timestamp.date() != self.current_date
 
     def calculate_consumption_today(self):
         """Calculate the consumption of today (d_0)."""
@@ -120,9 +125,11 @@ def handle_smartmeter_message(client, userdata, msg):
     """Handle MQTT message for smartmeter total values."""
     value = float(msg.payload.decode())
     userdata.add_value(value)
-    if userdata.d0 and not DEBUG:
+    if DEBUG:
+        return  # do nothing, stop here
+    if userdata.d0:
         client.publish(MQTT_TOPIC_D0, round(userdata.d0, 2), retain=userdata.retain)
-    if userdata.d1 and not DEBUG:
+    if userdata.d1:
         client.publish(MQTT_TOPIC_D1, round(userdata.d1, 2), retain=userdata.retain)
 
 
@@ -134,13 +141,13 @@ def handle_retained_dx_message(client, userdata, msg):
         # store value to be used as initial offset
         userdata.d0_retained = value
         logging.info("d0 (retained): %.2f", userdata.d0_retained)
-        # no further handling of this topic is required
+        # this topic is now done, no further handling is required in this session
         client.unsubscribe(msg.topic)
     elif msg.topic == MQTT_TOPIC_D1:
         # store value to be used as initial offset
         userdata.d1_retained = value
         logging.info("d1 (retained): %.2f", userdata.d1_retained)
-        # no further handling of this topic is required
+        # this topic is now done, no further handling is required in this session
         client.unsubscribe(msg.topic)
     else:
         logging.warning("Unexpected message! (%s, %s)", msg.topic, msg.payload)
@@ -153,7 +160,7 @@ def get_config(configfile: Path):
         configfile = __script_dir.joinpath(configfile)
     logging.info("Config file: %s", configfile.resolve())
     if not configfile.is_file():
-        raise RuntimeError(f"No configfile! ({configfile.resolve()})")
+        raise FileNotFoundError(f"No configfile! ({configfile.resolve()})")
     if not os.access(configfile, os.R_OK):
         raise RuntimeError(f"Configfile not readable! ({configfile.resolve()})")
     res = config.read(configfile)
@@ -166,7 +173,7 @@ def main():
     setup_logging(level=logging.INFO if not DEBUG else logging.DEBUG)
 
     # configuration
-    config = get_config(Path('config.ini'))
+    config = get_config(Path(CONFIG_FILENAME))
     mqtt_username = config.get('Mqtt', 'username')
     mqtt_password = config.get('Mqtt', 'password')
     mqtt_host = config.get('Mqtt', 'host', fallback='localhost')
