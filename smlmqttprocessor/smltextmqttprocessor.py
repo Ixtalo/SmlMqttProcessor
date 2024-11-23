@@ -21,8 +21,9 @@ Options:
   --config <file> Configuration file [default: config.local.ini]
   --no-mqtt       Do not send over MQTT (mainly for testing).
   -q --quiet      Be quiet, show only errors.
-  -v --verbose    Verbose output.
-  --debug         Debug mode (logging.DEBUG).
+  -t --timeout=N  Timeout in seconds [default: 0].
+  -v --verbose    Verbose output (INFO level).
+  -w --window=N   Window size.
   -h --help       Show this screen.
   --version       Show version.
 """
@@ -45,28 +46,29 @@ Options:
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 import configparser
-import json
 import logging
 import os
-import statistics
 import sys
 import time
 # pylint: disable=redefined-builtin
 from codecs import open
-from enum import IntEnum
+from pathlib import Path
 from pprint import pprint
 
 # https://pypi.org/project/paho-mqtt/#usage-and-api
-import paho.mqtt.client as mqtt
 # PySML, https://pypi.org/project/pysml/
 # noinspection PyUnresolvedReferences,PyPackageRequirements
 # pylint: disable=import-error,unused-import
 import sml  # noqa: F401
 from docopt import docopt
 
-__version__ = "1.16.0"
+from smlmqttprocessor.mqtt import MyMqtt
+from smlmqttprocessor.utils.message_utils import convert_messages2records
+from smlmqttprocessor.utils.mylogging import setup_logging
+
+__version__ = "1.17.0"
 __date__ = "2020-04-21"
-__updated__ = "2024-10-27"
+__updated__ = "2024-11-20"
 __author__ = "Ixtalo"
 __license__ = "AGPL-3.0+"
 __email__ = "ixtalo@gmail.com"
@@ -80,19 +82,19 @@ __status__ = "Production"
 # dictionary: MQTT-topic --> OBIS-code
 # for OBIS codes see e.g. https://wiki.volkszaehler.org/software/obis
 SML_FIELDS = {
-    'total': '1-0:1.8.0*255',          # Zählerstand Bezug
+    'total': '1-0:1.8.0*255',  # Zählerstand Bezug
     'total_tariff1': '1-0:1.8.1*255',  # Zählerstand Bezug Tarif 1
     'total_tariff2': '1-0:1.8.2*255',  # Zählerstand Bezug Tarif 2
     'total_tariff3': '1-0:1.8.3*255',  # Zählerstand Bezug Tarif 3
     'total_tariff4': '1-0:1.8.4*255',  # Zählerstand Bezug Tarif 4
 
-    'total_export': '1-0:2.8.0*255',          # Zählerstand Lieferung
+    'total_export': '1-0:2.8.0*255',  # Zählerstand Lieferung
     'total_export_tariff1': '1-0:2.8.1*255',  # Zählerstand Lieferung Tarif 1
     'total_export_tariff2': '1-0:2.8.2*255',  # Zählerstand Lieferung Tarif 2
     'total_export_tariff3': '1-0:2.8.3*255',  # Zählerstand Lieferung Tarif 3
     'total_export_tariff4': '1-0:2.8.4*255',  # Zählerstand Lieferung Tarif 4
 
-    'actual': '1-0:16.7.0*255',     # Leistung (Momentan)
+    'actual': '1-0:16.7.0*255',  # Leistung (Momentan)
     'actual_l1': '1-0:36.7.0*255',  # Leistung L1 (Momentan)
     'actual_l2': '1-0:56.7.0*255',  # Leistung L2 (Momentan)
     'actual_l3': '1-0:76.7.0*255',  # Leistung L3 (Momentan)
@@ -112,200 +114,12 @@ SML_HEADERS = ('1-0:96.50.1*1#', '129-129:199.130.3*255#')
 # f-string does not work with Python 3.5
 # pylint: disable=consider-using-f-string
 
-DEBUG = 0
-PROFILE = 0
-__SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
-
-# check for Python3
-if sys.version_info < (3, 5):
-    sys.stderr.write("Minimum required version is Python 3.5!\n")
-    sys.exit(1)
-
-
-class ExitCodes(IntEnum):
-    """Exit/return codes."""
-
-    OK = 0
-    CONFIG_FAIL = 3
-
-
-class MyMqtt:
-    """MQTT publishing."""
-
-    def __init__(self, config):
-        """MQTT publishing.
-
-        :param config: ConfigParser object, e.g. from config.ini
-        """
-        self.client = None
-        self.config = config
-        self.connected = False
-
-    def connect(self):
-        """Connect to MQTT server and handle disconnection/reconnection events."""
-        # noinspection PyUnusedLocal,PyShadowingNames
-        # pylint: disable=invalid-name,unused-argument
-        def on_connect(client, userdata, flags, rc):
-            logging.info("MQTT connect: %s (%d)", mqtt.connack_string(rc), rc)
-            self.connected = True
-
-        # noinspection PyUnusedLocal,PyShadowingNames
-        # pylint: disable=invalid-name,unused-argument
-        def on_disconnect(client, userdata, rc):
-            self.connected = False
-            if rc == mqtt.MQTT_ERR_SUCCESS:
-                logging.info('MQTT disconnect: successful.')
-            else:
-                logging.warning("MQTT unexpected disconnection! %s (%d)", mqtt.error_string(rc), rc)
-
-        ##
-        # NOTE!
-        # Creating a new Client() seems to be necessary.
-        # Just using reconnect() or connect() again did not work.
-        ##
-        client = mqtt.Client("SmlTextMqttProcessor")
-
-        # store as class variable to be accessible later
-        self.client = client
-
-        if self.config.has_option('Mqtt', 'username'):
-            client.username_pw_set(self.config.get('Mqtt', 'username'),
-                                   password=self.config.get('Mqtt', 'password'))
-        client.reconnect_delay_set(min_delay=1, max_delay=120)
-        client.on_connect = on_connect
-        client.on_disconnect = on_disconnect
-
-        host = self.config.get('Mqtt', 'host', fallback='localhost')
-        port = self.config.getint('Mqtt', 'port', fallback=1883)
-
-        # try-to-connect loop
-        client.connected = False
-        wait_time = 1
-        while not self.connected:
-            try:
-                client.connect(host, port=port)
-                # loop_start() is necessary for on_* to work
-                # (asynchronous handling starts)
-                client.loop_start()
-                break
-            except Exception as ex:
-                logging.error("MQTT connect exception! %s: %s", type(ex).__name__, ex)
-                # increase waiting time
-                wait_time *= 2
-                # limit waiting time to max. 180 sec = 3 min
-                wait_effective = min(wait_time, 180)
-                logging.debug("waiting %d seconds before reconnect attempt...", wait_effective)
-                time.sleep(wait_effective)
-
-    def disconnect(self):
-        """Disconnect from MQTT server."""
-        self.client.disconnect()
-        self.connected = False
-
-    @staticmethod
-    def construct_mqttdata(field2values):
-        """Construct a 2-dimensional dictionary fieldname-->value-type-->value.
-
-        Example:
-           total --> mean --> value
-           result['tptal']['mean'] := mean(collected-values)
-
-        :param field2values: collected data, dictionary: fieldname --> [data points]
-        :return: 2-dim dictionary fieldname --> value-type --> value
-        """
-        result = {}
-        # special handling for time field
-        if 'time' in field2values:
-            result['time'] = {}
-            result['time']['value'] = field2values['time'][-1]
-            result['time']['first'] = field2values['time'][0]
-            result['time']['last'] = field2values['time'][-1]
-        for name, values in field2values.items():
-            if name == 'time':
-                # do not output math statistics (mean, stdev etc.) for the time field
-                continue
-            if not values:
-                # could be empty, e.g. if no such data has been observed
-                continue
-            if name == "total":
-                # special handling for the "total" field (no math stats)
-                result[name] = {}
-                result[name]['value'] = values[-1]
-                result[name]['first'] = values[0]
-                result[name]['last'] = values[-1]
-                continue
-            result[name] = {}
-            result[name]['value'] = values[-1]
-            result[name]['first'] = values[0]
-            result[name]['last'] = values[-1]
-            result[name]['median'] = round(statistics.median(values), 1)
-            result[name]['mean'] = round(statistics.mean(values), 1)
-            result[name]['min'] = min(values)
-            result[name]['max'] = max(values)
-            result[name]['stdev'] = round(statistics.stdev(values), 1)
-        return result
-
-    def send(self, field2values):
-        """Publish (send) data to MQTT.
-
-        :param field2values: collected data, dictionary: fieldname --> [data points]
-        :return: Nothing
-        """
-        if not self.connected:
-            self.connect()
-
-        topic_prefix = self.config.get('Mqtt', 'topic_prefix', fallback='tele/smartmeter')
-        single = self.config.getboolean('Mqtt', 'single_topic', fallback='false')
-        retain = self.config.getboolean('Mqtt', 'retain', fallback='false')
-
-        # construct 2-dim dictionary fieldname --> value-type --> value
-        mqttdata = self.construct_mqttdata(field2values)
-
-        if single:
-            # single-topic sending, i.e. everything as one single topic and JSON payload
-            self.client.publish(topic_prefix, json.dumps(mqttdata), retain=retain)
-        else:
-            # multi-topic sending, i.e. each data entry as one unique topic, multiple messages
-            for name, subname_value in mqttdata.items():
-                # name = e.g. total / actual
-                # subname_value = dict e.g. {"first": 123) / {"mean": 56.5} / ...
-                for subname, value in subname_value.items():
-                    # name = e.g. total / actual
-                    # subname = e.g. value / min / max / first / last / ...
-
-                    # by default do not set the MQTT retain flag but only for specific fields
-                    myretain = False
-                    if retain and name in ('total', 'time') and subname == 'value':
-                        # only retain for .../total/value and .../time/value
-                        myretain = True
-
-                    # construct topic, e.g., 'tele/smartmeter/time/value'
-                    topic = "%s/%s/%s" % (topic_prefix, name, subname)
-                    # MQTT publish
-                    self.client.publish(topic, value, retain=myretain)
-
-
-def convert_messages2records(messages):
-    """Convert a list of message-dictionaries to a dictionary with value-lists.
-
-    This is:
-        [ {a:11, b:12}, {a:21, b:22}, ... ]  --> {a:[11,21], b:[12,22]}
-
-    :param messages:
-    :return:
-    """
-    records = {}
-    for message in messages:
-        for key, value in message.items():
-            if key in records:
-                records[key].append(value)
-            else:
-                records[key] = [value]  # start a new list
-    return records
+DEBUG = bool(os.getenv("DEBUG", "").lower() in ("1", "true", "yes"))
+__script_dir = Path(__file__).parent.parent  # project root
 
 
 def check_stream_packet_begin(line):
-    """Check if the given string line contains a SML header indicating a new message block.
+    """Check if the given string line contains an SML header indicating a new message block.
 
     :param line: line (string)
     :return: True if begin of new message
@@ -342,13 +156,13 @@ def parse_line(line):
     return None
 
 
-def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
-    """Run the main processing loop on input stream.
+def processing_loop(input_stream, window_size, callback, timeout=0, deltas=None):
+    """Run the main processing loop on the input stream.
 
     If size of rolling window is reached then call handler function mqtt_or_println.
     A timeout can be specified to stop after n seconds of no data (e.g. for STDIN).
 
-    :param istream: input stream
+    :param input_stream: input stream
     :param window_size: rolling window size, size of aggregation window
     :param callback: reference to messages handling callback function
     :param timeout: timeout in seconds, 0 for no timeout
@@ -359,15 +173,16 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
     messages = []
     n_nodata = 0
     while True:
-        line = istream.readline().strip()
+        line = input_stream.readline().strip()
         if not line:
             n_nodata += 1
             if timeout and n_nodata >= timeout:
-                logging.warning("#%d times no data observed, timeout hit, aborting!", n_nodata)
+                logging.warning("#%d times no data observed, timeout hit, aborting!",
+                                n_nodata)
                 messages.append(message)
                 callback(messages)
                 break
-            logging.debug("No data observed...waiting 1 second...")
+            logging.debug("no data observed...waiting 1 second...")
             time.sleep(1)
 
         if isinstance(line, bytes):
@@ -386,14 +201,16 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
 
             n_msgs = len(messages)
             if n_msgs >= window_size:
-                logging.info("window (%d) filled, handling #%d messages...", window_size, n_msgs)
+                logging.info("window (%d) filled, handling #%d messages...",
+                             window_size, n_msgs)
                 callback(messages)  # handle all messages
-                messages = []       # start a new collection
+                messages = []  # start a new collection
             elif deltas and n_msgs >= 2:
                 # dynamic checking of all fields in message according to declared delta-thresholds
                 for field_name, delta_value in deltas.items():
                     if field_name not in messages[-2] or field_name not in messages[-1]:
-                        logging.warning("No such field with name '%s' in message!", field_name)
+                        logging.warning("No such field with name '%s' in message!",
+                                        field_name)
                         continue
 
                     # compute delta/difference of the latest 2 messages
@@ -412,13 +229,14 @@ def processing_loop(istream, window_size, callback, timeout=0, deltas=None):
                         logging.info("field '%s', delta: %d, above threshold (%d), handling...",
                                      field_name, delta, delta_value)
                         callback(messages)  # handle all messages
-                        messages = []       # start a new collection
+                        messages = []  # start a new collection
                         # stop delta stuff, i.e., only 1 handling when delta event happens
                         break
 
             # current header-line is done, proceed to next line
             continue
 
+        # try to parse the next incoming line (from sml_server_time)
         try:
             # parse libSML text line
             result = parse_line(line)
@@ -444,22 +262,19 @@ def main():
     arg_input = arguments['<input>']
     arg_configfile = arguments['--config']
     arg_verbose = arguments['--verbose']
-    arg_debug = arguments['--debug']
     arg_quiet = arguments['--quiet']
     arg_no_mqtt = arguments['--no-mqtt']
+    arg_timeout = int(arguments['--timeout'])
+    arg_window_size = arguments['--window']
 
-    # setup logging
-    logging.basicConfig(level=logging.WARNING,
-                        format='%(asctime)s %(levelname)-8s %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
-    if DEBUG or arg_debug:
-        logging.getLogger('').setLevel(logging.DEBUG)
-        logging.debug('---- ENABLING DEBUG OUTPUT!!! -------')
-        logging.debug(arguments)
-    elif arg_verbose:
-        logging.getLogger('').setLevel(logging.INFO)
-    elif arg_quiet:
-        logging.getLogger('').setLevel(logging.ERROR)
+    log_level = logging.WARNING
+    if arg_verbose:
+        log_level = logging.INFO
+    if arg_quiet:
+        log_level = logging.ERROR
+    if DEBUG:
+        log_level = logging.DEBUG
+    setup_logging(level=log_level)
 
     logging.info(version_string)
     logging.debug("arguments: %s", arguments)
@@ -467,15 +282,14 @@ def main():
     # Configuration
     config = configparser.ConfigParser()
     if arg_configfile:
-        if not os.path.isabs(arg_configfile):
+        configfile = Path(arg_configfile)
+        if not configfile.is_absolute():
             # if not an absolute path then make it one based on this very script's folder
-            arg_configfile = os.path.join(__SCRIPT_DIR, arg_configfile)
-        arg_configfile = os.path.abspath(arg_configfile)
-        logging.info("Config file: %s", arg_configfile)
-        if not (os.path.isfile(arg_configfile) and os.access(arg_configfile, os.R_OK)):
-            logging.error('Config file is not a file or not accessible! Aborting.')
-            return ExitCodes.CONFIG_FAIL
-        config.read(arg_configfile)
+            configfile = __script_dir.joinpath(configfile)
+        logging.info("Config file: %s", configfile.resolve())
+        if not (configfile.is_file() and os.access(configfile, os.R_OK)):
+            raise RuntimeError('Config file is not a file or not accessible! Aborting.')
+        config.read(configfile)  # does not fail by itself when configfile is not accessible
         # combine all config dicts, and mask password
         logging.info("Configuration: %s", {**config.defaults(), **dict(config.items())})
 
@@ -495,19 +309,20 @@ def main():
 
     # rolling window period
     window_size = config.getint(configparser.DEFAULTSECT, 'block_size', fallback=30)
+    if arg_window_size:
+        # overwrite by CLI
+        window_size = int(arg_window_size)
     logging.info('Aggregation/rolling window size: %d', window_size)
 
     # input stream
-    if arg_input == '-':
-        # pylint: disable=consider-using-with
-        istream = sys.stdin
-    else:
-        istream = open(arg_input)
+    # pylint: disable=consider-using-with
+    istream = sys.stdin if arg_input == "-" else open(arg_input)
     logging.info("Input stream: %s", istream)
 
     # MQTT
     mymqtt = MyMqtt(config)
 
+    # this callback will be called when a message has arrived and has been parsed
     def mqtt_or_println(messages):
         records = convert_messages2records(messages)
         if arg_no_mqtt:
@@ -518,25 +333,11 @@ def main():
             mymqtt.send(records)
 
     # main processing loop on input stream
-    # if size of rolling window is reached then call handler function mqtt_or_println
-    processing_loop(istream, window_size, mqtt_or_println, deltas=deltas)
+    # IF (size of rolling window is reached) THEN call handler function mqtt_or_println
+    processing_loop(istream, window_size, mqtt_or_println, deltas=deltas, timeout=arg_timeout)
 
-    return ExitCodes.OK
+    return 0
 
 
 if __name__ == '__main__':
-    if DEBUG:
-        sys.argv.append('--verbose')
-    if os.environ.get("PROFILE", "").lower() in ("true", "1", "yes"):
-        # pylint: disable-next=ungrouped-imports
-        from time import strftime
-        import cProfile
-        import pstats
-        profile_filename = "%s_%s" % (__file__, strftime('%Y-%m-%d_%H%M%S')).profile
-        cProfile.run('main()', profile_filename)
-        with open("%s.txt" % profile_filename, "w", encoding="utf8") as statsfp:
-            profile_stats = pstats.Stats(profile_filename, stream=statsfp)
-            stats = profile_stats.strip_dirs().sort_stats('cumulative')
-            stats.print_stats()
-        sys.exit(0)
     sys.exit(main())

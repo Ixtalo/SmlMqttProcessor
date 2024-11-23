@@ -1,5 +1,5 @@
-.?venv/
-.pytest_cache/
+venv/
+.venv/
 
 attic/
 doc/
@@ -10,14 +10,12 @@ sml_server_time/
 htmlcov/
 
 config.ini
-config.local.ini
+config.dev.ini
 coverage.xml
 
+Dockerfile*
 
-**/.git
-**/.gitignore
 **/.git*
-**/.github
 **/.idea
 **/.project
 **/__pycache__
