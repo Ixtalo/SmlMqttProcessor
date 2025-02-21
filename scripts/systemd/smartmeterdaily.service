@@ -1,0 +1,14 @@
+[Unit]
+Description=SmartmeterDaily
+After=network.target
+
+[Service]
+ExecStart=/mydata/user/SmartmeterDaily/.venv/bin/python3 /mydata/user/SmartmeterDaily/generate_d0_d1.py
+WorkingDirectory=/mydata/ast/work/SmartmeterDaily
+Restart=always
+User=ast
+Group=ast
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target
